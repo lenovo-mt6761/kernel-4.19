@@ -69,7 +69,13 @@ ccflags-y += -I$(src)/../include/btif
 ###############################################################################
 
 MODULE_NAME := bt_drv_$(BT_PLATFORM)
+ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
+$(warning $(MODULE_NAME) build-in boot.img)
+obj-y += $(MODULE_NAME).o
+else
+$(warning $(MODULE_NAME) is kernel module)
 obj-m += $(MODULE_NAME).o
+endif
 
 ccflags-y += -D CREATE_NODE_DYNAMIC=1
 

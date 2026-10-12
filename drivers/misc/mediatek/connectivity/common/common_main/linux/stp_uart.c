@@ -116,7 +116,9 @@ UINT8 tx_buf[MTKSTP_BUFFER_SIZE] = { 0x0 };
 INT32 rd_idx;
 INT32 wr_idx;
 /* struct semaphore buf_mtx; */
-spinlock_t buf_lock;
+/* TB301FU (sjllls): removed unused global buf_lock - it collided with
+ * fs/exfat exfat_cache.c when both are linked into vmlinux; every real
+ * user in this file is commented out anyway. */
 static struct tty_ldisc_ops stp_uart_ldisc;
 static INT32 mtk_wcn_uart_tx(const PUINT8 data, const UINT32 size, PUINT32 written_size);
 

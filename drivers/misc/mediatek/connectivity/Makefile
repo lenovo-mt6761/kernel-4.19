@@ -83,33 +83,26 @@ endif
             $(error $(ABS_PATH_TO_WLAN_DRV) is not existed)
         endif
 
-        $(warning symbolic link to $(PATH_TO_WMT_DRV))
-        $(warning symbolic link to $(PATH_TO_WLAN_CHR_DRV))
-        $(warning symbolic link to $(PATH_TO_WLAN_DRV))
-
-        $(shell unlink $(srctree)/$(src)/wmt_drv)
-        $(shell unlink $(srctree)/$(src)/wmt_chrdev_wifi)
-        $(shell unlink $(srctree)/$(src)/wlan_drv_gen4m)
-
-        $(shell ln -s $(ABS_PATH_TO_WMT_DRV)      $(srctree)/$(src)/wmt_drv)
-        $(shell ln -s $(ABS_PATH_TO_WLAN_CHR_DRV) $(srctree)/$(src)/wmt_chrdev_wifi)
-        $(shell ln -s $(ABS_PATH_TO_WLAN_DRV)     $(srctree)/$(src)/wlan_drv_gen4m)
+        # TB301FU (sjllls): NO vendor-tree symlinks here. The Teracube
+        # kernel-tree Kbuild/Makefile files (common/, wlan/adaptor/,
+        # wlan/core/gen4m/) already natively flip to obj-y when
+        # CONFIG_WLAN_DRV_BUILD_IN=y. Creating the upstream wmt_drv/
+        # wmt_chrdev_wifi/ wlan_drv_gen4m/ symlinks on top of that builds
+        # every object twice and fails vmlinux link with duplicate symbols.
+        # The Kbuild files below are descended into once via the plain
+        # obj-$(CONFIG_xxx) lines further down.
 
         # Do build-in for xxx.c checking
         subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
         subdir-ccflags-y += -D MTK_WCN_BUILT_IN_DRIVER
-        obj-y += wmt_drv/
-        obj-y += wmt_chrdev_wifi/
-        obj-y += wlan_drv_gen4m/
     endif
 
     obj-$(CONFIG_MTK_COMBO) += common/
     obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/adaptor/
-    # TB301FU (sjllls): gen4m is a vendor loadable module on this device
-    # (stock vmlinux contains no gen4m symbols); building it in-tree would
-    # produce a .ko with unresolved references to the external
-    # wmt_chrdev_wifi module. Only built via CONFIG_WLAN_DRV_BUILD_IN above.
-    # obj-$(CONFIG_MTK_COMBO_CHIP_CONSYS_6765) += wlan/core/gen4m/
+    # TB301FU (sjllls): gen4m is built-in via CONFIG_WLAN_DRV_BUILD_IN
+    # (its own Makefile flips obj-y; CONFIG_MTK_COMBO_WIFI=y is required
+    # so the HIF/HAL config selects the right flavor).
+    obj-$(CONFIG_MTK_COMBO_CHIP_CONSYS_6765) += wlan/core/gen4m/
     obj-$(CONFIG_MTK_BTIF) += bt/mt66xx/wmt/
     obj-$(CONFIG_MTK_COMBO_GPS) += gps/
     obj-$(CONFIG_MTK_FMRADIO) += fmradio/
