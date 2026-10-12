@@ -49,39 +49,32 @@ endif
     ifeq ($(CONFIG_MTK_COMBO), y)
         ccflags-y += -D CFG_CONNADP_BUILD_IN
     endif
+
+    # for gen4m options
+    export CONFIG_MTK_COMBO_WIFI_HIF=axi
+    export MTK_COMBO_CHIP=CONNAC
+    export BT_PLATFORM=connac1x
+    export WLAN_CHIP_ID=6765
+    export MTK_ANDROID_WMT=y
+    export MTK_ANDROID_EMI=y
+    export WIFI_IP_SET=1
+    export WIFI_ECO_VER=1
+    export MTK_WLAN_SERVICE=yes
     # Do build-in for Makefile checking
     # export CONFIG_WLAN_DRV_BUILD_IN=y
 
     ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
-        # TB301FU (tc422/mt6761, sjllls): build all connectivity drivers
-        # (wmt/conninfra/connfem/wlan/bt/gps/fm) into the kernel image.
-        PATH_TO_WMT_DRV        = vendor/mediatek/kernel_modules/connectivity/common
-        PATH_TO_CONNINFRA_DRV  = vendor/mediatek/kernel_modules/connectivity/conninfra
-        PATH_TO_CONNFEM_DRV    = vendor/mediatek/kernel_modules/connectivity/connfem
-        PATH_TO_WLAN_CHR_DRV   = vendor/mediatek/kernel_modules/connectivity/wlan/adaptor
-        PATH_TO_WLAN_DRV       = vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m
-        PATH_TO_BT_DRV         = vendor/mediatek/kernel_modules/connectivity/bt/linux_v2
-        PATH_TO_GPS_DRV        = vendor/mediatek/kernel_modules/connectivity/gps
-        PATH_TO_FM_DRV         = vendor/mediatek/kernel_modules/connectivity/fmradio
+        PATH_TO_WMT_DRV      = vendor/mediatek/kernel_modules/connectivity/common
+        PATH_TO_WLAN_CHR_DRV = vendor/mediatek/kernel_modules/connectivity/wlan/adaptor
+        PATH_TO_WLAN_DRV     = vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m
 
-        ABS_PATH_TO_WMT_DRV        = $(srctree)/../$(PATH_TO_WMT_DRV)
-        ABS_PATH_TO_CONNINFRA_DRV  = $(srctree)/../$(PATH_TO_CONNINFRA_DRV)
-        ABS_PATH_TO_CONNFEM_DRV    = $(srctree)/../$(PATH_TO_CONNFEM_DRV)
-        ABS_PATH_TO_WLAN_CHR_DRV   = $(srctree)/../$(PATH_TO_WLAN_CHR_DRV)
-        ABS_PATH_TO_WLAN_DRV       = $(srctree)/../$(PATH_TO_WLAN_DRV)
-        ABS_PATH_TO_BT_DRV         = $(srctree)/../$(PATH_TO_BT_DRV)
-        ABS_PATH_TO_GPS_DRV        = $(srctree)/../$(PATH_TO_GPS_DRV)
-        ABS_PATH_TO_FM_DRV         = $(srctree)/../$(PATH_TO_FM_DRV)
+        ABS_PATH_TO_WMT_DRV      = $(srctree)/../$(PATH_TO_WMT_DRV)
+        ABS_PATH_TO_WLAN_CHR_DRV = $(srctree)/../$(PATH_TO_WLAN_CHR_DRV)
+        ABS_PATH_TO_WLAN_DRV     = $(srctree)/../$(PATH_TO_WLAN_DRV)
 
-        # check connectivity driver folders
+        # check wlan driver folder
         ifeq (,$(wildcard $(ABS_PATH_TO_WMT_DRV)))
             $(error $(ABS_PATH_TO_WMT_DRV) is not existed)
-        endif
-        ifeq (,$(wildcard $(ABS_PATH_TO_CONNINFRA_DRV)))
-            $(error $(ABS_PATH_TO_CONNINFRA_DRV) is not existed)
-        endif
-        ifeq (,$(wildcard $(ABS_PATH_TO_CONNFEM_DRV)))
-            $(error $(ABS_PATH_TO_CONNFEM_DRV) is not existed)
         endif
         ifeq (,$(wildcard $(ABS_PATH_TO_WLAN_CHR_DRV)))
             $(error $(ABS_PATH_TO_WLAN_CHR_DRV) is not existed)
@@ -89,68 +82,38 @@ endif
         ifeq (,$(wildcard $(ABS_PATH_TO_WLAN_DRV)))
             $(error $(ABS_PATH_TO_WLAN_DRV) is not existed)
         endif
-        ifeq (,$(wildcard $(ABS_PATH_TO_BT_DRV)))
-            $(error $(ABS_PATH_TO_BT_DRV) is not existed)
-        endif
-        ifeq (,$(wildcard $(ABS_PATH_TO_GPS_DRV)))
-            $(error $(ABS_PATH_TO_GPS_DRV) is not existed)
-        endif
-        ifeq (,$(wildcard $(ABS_PATH_TO_FM_DRV)))
-            $(error $(ABS_PATH_TO_FM_DRV) is not existed)
-        endif
 
         $(warning symbolic link to $(PATH_TO_WMT_DRV))
-        $(warning symbolic link to $(PATH_TO_CONNINFRA_DRV))
-        $(warning symbolic link to $(PATH_TO_CONNFEM_DRV))
         $(warning symbolic link to $(PATH_TO_WLAN_CHR_DRV))
         $(warning symbolic link to $(PATH_TO_WLAN_DRV))
-        $(warning symbolic link to $(PATH_TO_BT_DRV))
-        $(warning symbolic link to $(PATH_TO_GPS_DRV))
-        $(warning symbolic link to $(PATH_TO_FM_DRV))
 
         $(shell unlink $(srctree)/$(src)/wmt_drv)
-        $(shell unlink $(srctree)/$(src)/conninfra)
-        $(shell unlink $(srctree)/$(src)/connfem)
         $(shell unlink $(srctree)/$(src)/wmt_chrdev_wifi)
         $(shell unlink $(srctree)/$(src)/wlan_drv_gen4m)
-        $(shell unlink $(srctree)/$(src)/bt_linux_v2)
-        $(shell unlink $(srctree)/$(src)/gps_drv)
-        $(shell unlink $(srctree)/$(src)/fmradio)
 
-        $(shell ln -s $(ABS_PATH_TO_WMT_DRV)       $(srctree)/$(src)/wmt_drv)
-        $(shell ln -s $(ABS_PATH_TO_CONNINFRA_DRV) $(srctree)/$(src)/conninfra)
-        $(shell ln -s $(ABS_PATH_TO_CONNFEM_DRV)   $(srctree)/$(src)/connfem)
-        $(shell ln -s $(ABS_PATH_TO_WLAN_CHR_DRV)  $(srctree)/$(src)/wmt_chrdev_wifi)
-        $(shell ln -s $(ABS_PATH_TO_WLAN_DRV)      $(srctree)/$(src)/wlan_drv_gen4m)
-        $(shell ln -s $(ABS_PATH_TO_BT_DRV)        $(srctree)/$(src)/bt_linux_v2)
-        $(shell ln -s $(ABS_PATH_TO_GPS_DRV)       $(srctree)/$(src)/gps_drv)
-        $(shell ln -s $(ABS_PATH_TO_FM_DRV)        $(srctree)/$(src)/fmradio)
-
-        # for gen4m options (TB301FU: MT6631 Connac 1.x, axi HIF)
-        export CONFIG_MTK_COMBO_WIFI_HIF=axi
-        export MTK_COMBO_CHIP=CONNAC
-        export WLAN_CHIP_ID=6761
-        export MTK_ANDROID_WMT=y
-        export MTK_WLAN_SERVICE=yes
-        export WIFI_IP_SET=1
-        export WIFI_ECO_VER=1
-        # bt/fmradio selects
-        export TARGET_BUILD_VARIANT=userdebug
-        export CFG_FM_PLAT=mt6630
-        export CFG_FM_CHIP=mt6630
+        $(shell ln -s $(ABS_PATH_TO_WMT_DRV)      $(srctree)/$(src)/wmt_drv)
+        $(shell ln -s $(ABS_PATH_TO_WLAN_CHR_DRV) $(srctree)/$(src)/wmt_chrdev_wifi)
+        $(shell ln -s $(ABS_PATH_TO_WLAN_DRV)     $(srctree)/$(src)/wlan_drv_gen4m)
 
         # Do build-in for xxx.c checking
         subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
         subdir-ccflags-y += -D MTK_WCN_BUILT_IN_DRIVER
         obj-y += wmt_drv/
-        obj-y += conninfra/
-        obj-y += connfem/
         obj-y += wmt_chrdev_wifi/
         obj-y += wlan_drv_gen4m/
-        obj-y += bt_linux_v2/
-        obj-y += gps_drv/
-        obj-y += fmradio/
     endif
+
+    obj-$(CONFIG_MTK_COMBO) += common/
+    obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/adaptor/
+    # TB301FU (sjllls): gen4m is a vendor loadable module on this device
+    # (stock vmlinux contains no gen4m symbols); building it in-tree would
+    # produce a .ko with unresolved references to the external
+    # wmt_chrdev_wifi module. Only built via CONFIG_WLAN_DRV_BUILD_IN above.
+    # obj-$(CONFIG_MTK_COMBO_CHIP_CONSYS_6765) += wlan/core/gen4m/
+    obj-$(CONFIG_MTK_BTIF) += bt/mt66xx/wmt/
+    obj-$(CONFIG_MTK_COMBO_GPS) += gps/
+    obj-$(CONFIG_MTK_FMRADIO) += fmradio/
+    obj-$(CONFIG_MTK_CONNFEM) += connfem/
 
 # Otherwise we were called directly from the command line;
 # invoke the kernel build system.
