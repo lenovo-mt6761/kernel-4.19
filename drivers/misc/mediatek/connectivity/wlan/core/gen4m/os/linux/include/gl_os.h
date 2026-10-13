@@ -1522,7 +1522,10 @@ netdev_tx_t wlanHardStartXmit(struct sk_buff *prSkb, struct net_device *prDev);
 typedef uint8_t (*file_buf_handler) (void *ctx,
 			const char __user *buf,
 			uint16_t length);
-extern void register_file_buf_handler(file_buf_handler handler,
+/* TB301FU (sjllls): renamed (was register_file_buf_handler) so the stale
+ * stock wlan_drv_gen4m.ko cannot resolve it and is rejected at insmod
+ * time instead of registering handlers and then dying with them dangling. */
+extern void mtk_register_file_buf_handler(file_buf_handler handler,
 			void *ctx,
 			uint8_t ucType);
 

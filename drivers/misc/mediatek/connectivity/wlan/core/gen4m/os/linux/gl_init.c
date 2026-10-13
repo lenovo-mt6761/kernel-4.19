@@ -3085,7 +3085,7 @@ static void wlanCreateWirelessDevice(void)
 		gprWdev[u4Idx] = prWdev[u4Idx];
 	}
 #if CFG_WLAN_ASSISTANT_NVRAM
-	register_file_buf_handler(wlanNvramBufHandler, (void *)NULL,
+	mtk_register_file_buf_handler(wlanNvramBufHandler, (void *)NULL,
 			ENUM_BUF_TYPE_NVRAM);
 #endif
 	DBGLOG(INIT, INFO, "Create wireless device success\n");
@@ -6269,10 +6269,31 @@ static void wlanRemove(void)
  */
 /*----------------------------------------------------------------------------*/
 /* 1 Module Entry Point */
+/*
+ * TB301FU (sjllls): single-instance guard shared between the built-in
+ * copy and any (stale vendor) module copy of this driver. When the
+ * driver is built-in, the stock wlan_drv_gen4m.ko from /vendor is still
+ * insmod'ed by modules.load. Its init registers file buffer handlers
+ * (e.g. wlanNvramBufHandler) into the chrdev adaptor BEFORE failing on
+ * duplicate resources; a failed init does not run module_exit, so the
+ * chrdev keeps a dangling function pointer into unmapped module space
+ * -> wlan_assistant Oops (IABT) at boot. With this flag the stale
+ * module copy bails out with -EEXIST before touching anything.
+ */
+int wlan_drv_init_state;
+EXPORT_SYMBOL(wlan_drv_init_state);
+
 static int initWlan(void)
 {
 	int ret = 0;
 	struct GLUE_INFO *prGlueInfo = NULL;
+
+	if (wlan_drv_init_state) {
+		DBGLOG(INIT, ERROR,
+		       "initWlan: driver instance already initialized, refusing duplicate init\n");
+		return -EEXIST;
+	}
+	wlan_drv_init_state = 1;
 
 #if defined(UT_TEST_MODE) && defined(CFG_BUILD_X86_PLATFORM)
 	/* Refer 6765 dts setting */
@@ -6464,6 +6485,7 @@ static void exitWlan(void)
 #endif
 
 	g_u4WlanInitFlag = 0;
+	wlan_drv_init_state = 0;
 	DBGLOG(INIT, INFO, "exitWlan\n");
 
 }				/* end of exitWlan() */
