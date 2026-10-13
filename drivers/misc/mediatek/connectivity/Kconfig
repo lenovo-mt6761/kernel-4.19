@@ -487,3 +487,12 @@ config WLAN_DRV_BUILD_IN
 	  connectivity) into the kernel image instead of as loadable
 	  modules. BT/GPS/FM follow the stock tc423 build and are built
 	  in-tree via MTK_BTIF/MTK_COMBO_GPS/MTK_FMRADIO.
+
+config MTK_WIFI_DRV_BUILD_IN
+	bool "Build WiFi drivers (gen4m/chrdev) into the kernel image"
+	depends on WLAN_DRV_BUILD_IN
+	default y
+	help
+	  Sub-switch of WLAN_DRV_BUILD_IN controlling only the WiFi
+	  pieces: wlan/core/gen4m and wlan/adaptor (wmt_chrdev_wifi).
+	  Set to n to keep them as loadable modules (bisect aid).
