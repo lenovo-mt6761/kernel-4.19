@@ -221,11 +221,11 @@ void clk_buf_control_bblpm(bool on)
 	if (!is_clkbuf_initiated || !is_pmic_clkbuf)
 		return;
 
-	if (on) 
+	if (on)
 		pmic_config_interface_nolock(PMIC_DCXO_CW00_SET_ADDR, 0x1,
 				      PMIC_XO_BB_LPM_EN_MASK,
 				      PMIC_XO_BB_LPM_EN_SHIFT);
-	else 
+	else
 		pmic_config_interface_nolock(PMIC_DCXO_CW00_CLR_ADDR, 0x1,
 				      PMIC_XO_BB_LPM_EN_MASK,
 				      PMIC_XO_BB_LPM_EN_SHIFT);
@@ -236,7 +236,7 @@ void clk_buf_control_bblpm(bool on)
 	pr_info("%s(%u): CW00=0x%x\n", __func__, (on ? 1 : 0), cw00);
 #endif
 #endif
-} 
+}
 
 
 
@@ -487,7 +487,7 @@ bool clk_buf_ctrl(enum clk_buf_id id, bool onoff)
 	else
 		return true;
 }
-EXPORT_SYMBOL(clk_buf_ctrl); 
+EXPORT_SYMBOL(clk_buf_ctrl);
 
 static u32 dcxo_dbg_read_auxout(u16 sel)
 {

@@ -47,7 +47,7 @@ struct mem_desc {
 	u64 start;
 	u64 size;
 };
- 
+
 struct dram_info {
 	u32 rank_num;
 	struct mem_desc rank_info[4];

@@ -93,7 +93,7 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 };
 
 struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
-	
+
 #ifdef MIPI_SWITCH
 	{
 		PLATFORM_POWER_SEQ_NAME,
@@ -201,7 +201,7 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_Low, 0},
 			{DOVDD, Vol_1800, 0},
 			{DVDD, Vol_1200, 0},
-			{AVDD, Vol_2800, 0},			
+			{AVDD, Vol_2800, 0},
 			{SensorMCLK, Vol_High, 1},
 			{PDN, Vol_High, 0},
 			{RST, Vol_High, 10}

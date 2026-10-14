@@ -189,9 +189,9 @@ static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[5] = {
 static kal_uint16 read_cmos_sensor(kal_uint32 addr)
 {
 	kal_uint16 get_byte = 0;
-	char pu_send_cmd[2] = { 
-		(char)((addr >> 8) & 0xff), 
-		(char)(addr & 0xff) 
+	char pu_send_cmd[2] = {
+		(char)((addr >> 8) & 0xff),
+		(char)(addr & 0xff)
 	};
 
 	iReadRegI2C(pu_send_cmd, 2, (u8 *)&get_byte, 1, imgsensor.i2c_write_id);
@@ -213,10 +213,10 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
 
 static void write_cmos_sensor_8bit(kal_uint32 addr, kal_uint32 para)
 {
-	char pu_send_cmd[3] = { 
-		(char)((addr >> 8) & 0xff), 
-		(char)(addr & 0xff), 
-		(char)(para & 0xff) 
+	char pu_send_cmd[3] = {
+		(char)((addr >> 8) & 0xff),
+		(char)(addr & 0xff),
+		(char)(para & 0xff)
 	};
 
 	iWriteRegI2C(pu_send_cmd, 3, imgsensor.i2c_write_id);
@@ -1511,7 +1511,7 @@ static int check_otp_data(void)
 		return 1;
 	else
 		return 0;
-	
+
 }
 
 
@@ -1587,7 +1587,7 @@ static kal_uint32 open(void)
 			break;
 		retry = 2;
 	}
-	
+
 	if (imgsensor_info.sensor_id != sensor_id)
 		return ERROR_SENSOR_CONNECT_FAIL;
 
@@ -1922,7 +1922,7 @@ static kal_uint32 set_max_framerate_by_scenario(enum MSDK_SCENARIO_ID_ENUM scena
 			(frame_length - imgsensor_info.cap.framelength) : 0;
 		imgsensor.frame_length = imgsensor_info.cap.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
-		spin_unlock(&imgsensor_drv_lock);	
+		spin_unlock(&imgsensor_drv_lock);
 		set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
@@ -2036,7 +2036,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		}
 		break;
 
-	/*only for Android R (Android 11)/ISP 5.0 
+	/*only for Android R (Android 11)/ISP 5.0
 	delete SENSOR_FEATURE_GET_PIXEL_RATE in Android Q (Android 10) & earlier versions*/
 	case SENSOR_FEATURE_GET_PIXEL_RATE:
 		switch (*feature_data) {

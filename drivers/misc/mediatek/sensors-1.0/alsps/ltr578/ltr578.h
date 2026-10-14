@@ -1,4 +1,4 @@
-/* 
+/*
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -77,7 +77,7 @@
 #define PS_NEAR_OFFSET_DEF		100
 #define PS_FAR_OFFSET_DEF		50
 
-/* 
+/*
  * Magic Number
  * ============
  * Refer to file ioctl-number.txt for allocation

@@ -176,7 +176,7 @@ static struct imgsensor_struct imgsensor = {
 	.current_scenario_id = MSDK_SCENARIO_ID_CAMERA_PREVIEW,
 	.ihdr_en = 0,		// sensor need support LE, SE with HDR feature
 	.i2c_write_id = 0x20,
-	
+
 	//Long exposure
 	.current_ae_effective_frame = 1,
 };
@@ -371,7 +371,7 @@ static void write_shutter(kal_uint32 shutter)
 
 		streaming_control(KAL_FALSE);
 		//mdelay(10);
-		
+
 		if ( shutter <= 75918 ) { //1s
 			LOG_INF("1s mode");
 			write_cmos_sensor_8(0x0340, 0x10);
@@ -382,7 +382,7 @@ static void write_shutter(kal_uint32 shutter)
 			write_cmos_sensor_8(0x0342, 0xFF);
 			write_cmos_sensor_8(0x0343, 0xFC);
 		}
-			
+
 		else if (shutter <= 151837 ){ //2s
 			LOG_INF("2s mode");
 			write_cmos_sensor_8(0x0340, 0x21);
@@ -439,10 +439,10 @@ static void write_shutter(kal_uint32 shutter)
 			LOG_INF("Exit long exposure mode");
 
 			mdelay(300);
-			
-			
+
+
 			streaming_control(KAL_FALSE);
-			
+
 
 			// write_cmos_sensor_8(0x0340, 0x09);
 			// write_cmos_sensor_8(0x0341, 0xE2);
@@ -457,7 +457,7 @@ static void write_shutter(kal_uint32 shutter)
 			//mdelay(10);
 
 			streaming_control(KAL_TRUE);
-			
+
 			bNeedSetNormalMode = 0;
 		}
 		else
@@ -700,7 +700,7 @@ static kal_uint32 streaming_control(kal_bool enable)
 			}
 		}
 	} else {
-		
+
 		//while(1) {
 		for( i = 0 ; i < 1000 ; i++)
 		{
@@ -928,7 +928,7 @@ static kal_uint16 s5k4h7_normal_video_setting[] = {
 };
 
 static kal_uint16 s5k4h7_hs_video_setting[] = {
-#if 0	
+#if 0
 	0x0100, 0x00,
 	0x0136, 0x18,
 	0x0137, 0x00,
@@ -2154,7 +2154,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 	case SENSOR_FEATURE_GET_AE_EFFECTIVE_FRAME_FOR_LE:
 		*feature_return_para_32 = imgsensor.current_ae_effective_frame;
 		break;
-		
+
 	case SENSOR_FEATURE_SET_SHUTTER_FRAME_TIME:
 		set_shutter_frame_length((UINT16) (*feature_data),
 				(UINT16) (*(feature_data + 1)),

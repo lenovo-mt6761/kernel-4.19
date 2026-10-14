@@ -88,7 +88,7 @@ struct imgsensor_info_struct {
 	kal_uint32 checksum_value; /* checksum value for Camera Auto Test */
 	struct imgsensor_mode_struct pre;
 	struct imgsensor_mode_struct cap;
-	struct imgsensor_mode_struct cap1; 
+	struct imgsensor_mode_struct cap1;
 	struct imgsensor_mode_struct normal_video;
 	struct imgsensor_mode_struct hs_video;
 	struct imgsensor_mode_struct slim_video;

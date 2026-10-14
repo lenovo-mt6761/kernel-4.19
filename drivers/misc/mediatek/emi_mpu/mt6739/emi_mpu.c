@@ -36,7 +36,7 @@
 #include <emi_bwl.h>
 #include <linux/memblock.h>
 #include <linux/arm-smccc.h>
-#include <linux/soc/mediatek/mtk_sip_svc.h> 
+#include <linux/soc/mediatek/mtk_sip_svc.h>
 static int Violation_PortID = MASTER_ALL;
 
 #define EMI_MPU_TEST	0
@@ -297,7 +297,7 @@ unsigned long long end, int region, unsigned int access_permission)
 	unsigned int end_align;
 	unsigned long flags;
 	struct arm_smccc_res res;
-	
+
 	access_permission = access_permission & 0x4FFFFFF;
 	access_permission = access_permission | ((region & 0x1F)<<27);
 	start_align = (unsigned int) (start >> 16);

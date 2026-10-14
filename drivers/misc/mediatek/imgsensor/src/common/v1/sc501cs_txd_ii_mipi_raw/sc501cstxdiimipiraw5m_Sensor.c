@@ -847,7 +847,7 @@ static void preview_setting(void)
      write_cmos_sensor8(0x3215,0x31);
      write_cmos_sensor8(0x3220,0x81);
      write_cmos_sensor8(0x5000,0x4e);
-     write_cmos_sensor8(0x5901,0x04);     
+     write_cmos_sensor8(0x5901,0x04);
 #endif
 }
 #if MULTI_WRITE
@@ -908,7 +908,7 @@ static void capture_setting(kal_uint16 currefps)
      write_cmos_sensor8(0x3215,0x11);
      write_cmos_sensor8(0x3220,0x80);
      write_cmos_sensor8(0x5000,0x0e);
-     write_cmos_sensor8(0x5901,0x00); 
+     write_cmos_sensor8(0x5901,0x00);
      } else {
      LOG_INF("capture_setting fps not 300");
      write_cmos_sensor8(0x301f,0x01);
@@ -921,7 +921,7 @@ static void capture_setting(kal_uint16 currefps)
      write_cmos_sensor8(0x3215,0x11);
      write_cmos_sensor8(0x3220,0x80);
      write_cmos_sensor8(0x5000,0x0e);
-     write_cmos_sensor8(0x5901,0x00); 
+     write_cmos_sensor8(0x5901,0x00);
      }
 #endif
 }
@@ -975,7 +975,7 @@ static void hs_video_setting(void)
      write_cmos_sensor8(0x3215,0x31);
      write_cmos_sensor8(0x3220,0x81);
      write_cmos_sensor8(0x5000,0x4e);
-     write_cmos_sensor8(0x5901,0x04); 
+     write_cmos_sensor8(0x5901,0x04);
 #endif
 }
 
@@ -1028,7 +1028,7 @@ static void slim_video_setting(void)
      write_cmos_sensor8(0x3215,0x31);
      write_cmos_sensor8(0x3220,0x81);
      write_cmos_sensor8(0x5000,0x4e);
-     write_cmos_sensor8(0x5901,0x04); 
+     write_cmos_sensor8(0x5901,0x04);
 #endif
 }
 
@@ -1147,13 +1147,13 @@ static int read_sc501cs_QRcode_info(kal_uint32 addr)
 static int sc501cs_sensor_otp_init(int section, kal_uint8 threshold){
 	int delay=0;
 	kal_uint16 otp_start_add_h,otp_start_add_l,otp_end_add_h,otp_end_add_l;
-	
+
 	if(section == 1) {
 		otp_start_add_h = (OTP_SECTION1_START_ADDR&0x0f00)>>8;
 		otp_start_add_l = OTP_SECTION1_START_ADDR&0x00ff;
 		otp_end_add_h   = (OTP_SECTION1_END_ADDR&0x0f00)>>8;
 		otp_end_add_l   = OTP_SECTION1_END_ADDR&0x00ff;
-		
+
 		write_cmos_sensor8(0x36b0,0x4c);
 		write_cmos_sensor8(0x36b1,threshold);
 		write_cmos_sensor8(0x36b2,0x01);
@@ -1177,14 +1177,14 @@ static int sc501cs_sensor_otp_init(int section, kal_uint8 threshold){
 		otp_start_add_l = OTP_SECTION2_START_ADDR&0x00ff;
 		otp_end_add_h   = (OTP_SECTION2_END_ADDR&0x0f00)>>8;
 		otp_end_add_l   = OTP_SECTION2_END_ADDR&0x00ff;
-		
+
 		write_cmos_sensor8(0x4408,otp_start_add_h);
 		write_cmos_sensor8(0x4409,otp_start_add_l);
 		write_cmos_sensor8(0x440a,otp_end_add_h);
 		write_cmos_sensor8(0x440b,otp_end_add_l);
 		write_cmos_sensor8(0x4401,0x1e);
 		write_cmos_sensor8(0x4400,0x11);
-		
+
 		while((read_cmos_sensor(0x4420)&0x01) == 0x01){
 			delay++;
 			if(delay == 1000) {
@@ -1211,7 +1211,7 @@ static int sc501cs_sensor_otp_init(int section, kal_uint8 threshold){
 	write_cmos_sensor8(0x440f,0x39);
 	write_cmos_sensor8(0x4401,0x1f);
 	#endif
-	
+
 	return 1;
 }
 
@@ -1299,7 +1299,7 @@ static int read_sc501cs_lsc_info(kal_uint32 addr)
 {
 	int check_sum_lsc = 0, check_sum_lsc_cal = 0;
 	int i;
-	
+
 	if(LSC_GROUP1_FLAG == addr){
 		for(i = 0; i < OTP_SECTION1_END_ADDR - addr; i++){
 			sc501cs_data_lsc[i]=read_cmos_sensor(addr+i+1);
@@ -1507,7 +1507,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			*sensor_id = return_sensor_id()+1;
-			if (*sensor_id == imgsensor_info.sensor_id) 
+			if (*sensor_id == imgsensor_info.sensor_id)
 			{
 				LOG_INF("i2c write id: 0x%x, txd sensor id: 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
 
@@ -1522,9 +1522,9 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 
 				  LOG_INF("Not Find sc501cs_txd\n");
 				  *sensor_id = 0xFFFFFFFF;
-		          return ERROR_SENSOR_CONNECT_FAIL; 
+		          return ERROR_SENSOR_CONNECT_FAIL;
 				}
-				
+
 				/*===显示sensorname接口===start*/
 				    if(*sensor_id == 0xee46)
                         {

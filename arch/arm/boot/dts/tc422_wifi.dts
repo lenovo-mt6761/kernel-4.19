@@ -170,7 +170,7 @@
 		reg = <0x3e>;
 		status = "okay";
 	};
-	
+
 	sgm37604a@36 {
 		compatible = "sgm37604a";
 		reg = <0x36>;
@@ -206,7 +206,7 @@
                power_vol = <0>;
 		als_level = <0 328 861 1377 3125 7721 7767 12621 23062 28430 33274 47116 57694 57694 65535>;
 		als_value = <0 200 320 502 1004 2005 3058 5005 8008 10010 12000 16000 20000 20000 20000 20000>;
-               //irq-gpio = <&pio 6 0x00>;               
+               //irq-gpio = <&pio 6 0x00>;
       };
       /*boe by linliangsong,add sensor,20220607,end*/
       stk3x1x@48 {

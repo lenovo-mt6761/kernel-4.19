@@ -22,8 +22,8 @@
 #ifndef mt_secure_call
 #define mtk_idle_smc_impl(p1, p2, p3, p4, p5, res) \
   	arm_smccc_smc(p1, p2, p3, p4,\
-	p5, 0, 0, 0, &res)	
-			
+	p5, 0, 0, 0, &res)
+
 #define mt_secure_call(x1, x2, x3, x4, x5) ({\
 	struct arm_smccc_res res;\
  	mtk_idle_smc_impl(x1, x2, x3, x4, x5, res);\

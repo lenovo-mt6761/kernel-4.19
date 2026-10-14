@@ -35,7 +35,7 @@
 
 #define CPS8851_REG_SWRESET					(0xA0)
 /*
- * The period a DRP will complete a Source to Sink and back advertisement. 
+ * The period a DRP will complete a Source to Sink and back advertisement.
  * (Period = TDRP * 6.4 + 51.2ms)
  * 0000 : 51.2ms
  * 0001 : 57.6ms

@@ -7,7 +7,7 @@
 
 #include <linux/clk.h>
 #include "imgsensor_clk.h"
-#include <linux/soc/mediatek/mtk-pm-qos.h> 
+#include <linux/soc/mediatek/mtk-pm-qos.h>
 
 /*by platform settings and elements should not be reordered */
 char *gimgsensor_mclk_name[IMGSENSOR_CCF_MAX_NUM] = {

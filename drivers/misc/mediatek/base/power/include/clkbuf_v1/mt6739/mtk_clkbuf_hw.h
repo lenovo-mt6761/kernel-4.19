@@ -40,7 +40,7 @@ enum clk_buf_id {
 	CLK_BUF_CHG,
 	CLK_BUF_UFS		= 6,
 	CLK_BUF_INVALID
-}; 
+};
 #endif
 /* xo_id: clock buffer list */
 #ifndef _xo_id_

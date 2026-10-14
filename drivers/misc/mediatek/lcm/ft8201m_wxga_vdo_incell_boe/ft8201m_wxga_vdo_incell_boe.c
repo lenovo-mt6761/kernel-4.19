@@ -767,7 +767,7 @@ static void lcm_init(void)
 	lcm_set_gpio_output(GPIO_LCD_RST, GPIO_OUT_ZERO);
 	MDELAY(1);
 	lcm_set_gpio_output(GPIO_LCD_RST, GPIO_OUT_ONE);
-	MDELAY(20);//OPARSLEY-2249--solve decrease wake up time,by anhengxuan.boe,20220811 
+	MDELAY(20);//OPARSLEY-2249--solve decrease wake up time,by anhengxuan.boe,20220811
 
 	push_table(NULL,
 		init_setting_vdo,

@@ -218,11 +218,11 @@ void clk_buf_control_bblpm(bool on)
 	if (!is_clkbuf_initiated || !is_pmic_clkbuf)
 		return;
 
-	if (on) 
+	if (on)
 		pmic_config_interface_nolock(PMIC_DCXO_CW00_SET_ADDR, 0x1,
 				      PMIC_XO_BB_LPM_EN_MASK,
 				      PMIC_XO_BB_LPM_EN_SHIFT);
-	else 
+	else
 		pmic_config_interface_nolock(PMIC_DCXO_CW00_CLR_ADDR, 0x1,
 				      PMIC_XO_BB_LPM_EN_MASK,
 				      PMIC_XO_BB_LPM_EN_SHIFT);
@@ -233,7 +233,7 @@ void clk_buf_control_bblpm(bool on)
 	pr_debug("%s(%u): CW00=0x%x\n", __func__, (on ? 1 : 0), cw00);
 #endif
 #endif
-} 
+}
 
 #ifdef CLKBUF_USE_BBLPM
 static void clk_buf_ctrl_bblpm_mask(enum clk_buf_id id, bool onoff)
@@ -767,7 +767,7 @@ bool clk_buf_ctrl(enum clk_buf_id id, bool onoff)
 	else
 		return true;
 }
-EXPORT_SYMBOL(clk_buf_ctrl); 
+EXPORT_SYMBOL(clk_buf_ctrl);
 
 void clk_buf_disp_ctrl(bool onoff)
 {
@@ -865,7 +865,7 @@ void clk_buf_dump_clkbuf_log(void)
 		     __func__, pmic_cw00, pmic_cw01, pmic_cw02, pmic_cw11,
 		     pmic_cw14, pmic_cw16, pmic_cw23);
 	pr_info("%s top_spi_con1=0x%x\n", __func__, top_spi_con1);
-} 
+}
 
 static u32 dcxo_dbg_read_auxout(u16 sel)
 {
@@ -1212,7 +1212,7 @@ u8 clk_buf_get_xo_en_sta(enum xo_id id)
 	clk_buf_get_xo_en();
 
 	return xo_en_stat[id];
-} 
+}
 
 void clk_buf_show_status_info(void)
 {
