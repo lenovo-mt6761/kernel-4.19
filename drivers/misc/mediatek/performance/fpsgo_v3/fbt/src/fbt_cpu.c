@@ -811,6 +811,41 @@ static void fbt_set_min_cap_locked(struct render_info *thr, int min_cap,
 	char *dep_str = NULL;
 	int ret;
 
+#if defined(CONFIG_MACH_MT6765)
+	/*
+	 * TB301FU: never raise the CPU uclamp floor from fpsgo.
+	 *
+	 * Symptom: the perf cluster (cpu0-3) stays pinned at the top OPP at
+	 * idle while the efficiency cluster scales normally.  The perf cluster
+	 * is perfectly capable of scaling -- switching the governor to
+	 * powersave makes it drop to the 900MHz bin immediately -- so the
+	 * OPP table and PLL path are healthy and the lock is a uclamp floor
+	 * kept high by fpsgo.
+	 *
+	 * Cause: FBT derives a per-task uclamp minimum from the render
+	 * pipeline and stores it on the render thread.  A thread whose process
+	 * has already exited can remain in render_pid_tree with that boost
+	 * still applied (seen on device: a dead pid reported by
+	 * /sys/kernel/fpsgo/fbt/fbt_info with perfidx 0 == the top bin, and
+	 * unchanged for 20+ seconds).  schedutil then legitimately keeps
+	 * asking for the top frequency.
+	 *
+	 * Note the existing `check && !uclamp_boost_enable` guard is not
+	 * enough: the boost is also installed through callers that pass
+	 * check == 0, so those bypass it.  Forcing min_cap to 0 here funnels
+	 * every caller into fbt_clear_min_cap() below, i.e. the boost is
+	 * simply never installed.
+	 *
+	 * This disables only the CPU uclamp boost.  fpsgo frame-rate
+	 * detection, GPU frequency control and perfidx accounting are
+	 * untouched, which is why the module as a whole is left enabled --
+	 * dropping the whole FPSGO module would also cost game frame-rate
+	 * guarantees.
+	 */
+	min_cap = 0;
+	check = 0;
+#endif
+
 	if (check && !uclamp_boost_enable)
 		return;
 

@@ -1261,49 +1261,68 @@ OPP_TBL(L,   C65OD, 9, L); /* opp_tbl_L_e9_0   */
 OPP_TBL(LL,  C65OD, 9, LL); /* opp_tbl_LL_e9_0  */
 OPP_TBL(CCI, C65OD, 9, CCI); /* opp_tbl_CCI_e9_0 */
 
-/* TB301FU overclock + undervolt (alps-overclock):
- * Perf(L) gains a 2500MHz top bin, Efficiency(LL) gains an 1800MHz top bin.
- * Voltage rule: from the new highest freq, voltage is shifted down one gear
- * (new top uses the old 2nd-highest voltage, etc.); the lowest 2 gears are
- * held at the 60000 (0.6V) PMIC floor, which also drops the 979MHz bin from
- * 62500 to 60000 -- a further power saving at the bottom. */
+/* TB301FU overclock (alps-overclock) -- 16-entry variant.
+ *
+ * WHY EXACTLY 16 ENTRIES (do not add a 17th bin):
+ *   The MTK fpsgo / upower framework hardcodes a 16-entry CPU table
+ *   (NR_FREQ_CPU == 16, see performance/fpsgo_v3_topology/eara_job/src/
+ *   eara_job.c) and indexes it with `row[NR_FREQ_CPU - opp - 1]`:
+ *
+ *       for (opp = 0; opp < NR_FREQ_CPU; opp++) {
+ *               cpu_dvfs[c].power[opp] = mt_cpufreq_get_freq_by_idx(c, opp);
+ *               cap = upower_get_core_tbl(cpu)->row[NR_FREQ_CPU-opp-1].cap;
+ *               cpu_dvfs[c].capacity_ratio[opp] = cap;
+ *       }
+ *       fbt_set_cap_limit();   // pushes the (now shifted) caps to cpufreq
+ *
+ *   Growing this table to 17 entries shifts every OPP index by one against
+ *   the 16-row hardware upower table, so fpsgo's capacity_ratio[] is filled
+ *   with the wrong capacities and fbt_set_cap_limit() then pins both clusters
+ *   at the top bin -- the device reports a frequency-locked core.
+ *   Hence: keep 16 bins and raise the ceiling in place instead.
+ *
+ * Strategy: keep the 16 stock gears one-for-one (so fpsgo's capacity table
+ * stays aligned), raise the ceiling in place to 2.5GHz / 1.8GHz, and drop
+ * 10000 (0.1V) from every gear's voltage.  Voltages are clamped at the
+ * 60000 (0.6V) PMIC floor, which is why the four lowest gears of the L
+ * cluster and the four lowest of the LL cluster keep 60000 instead of
+ * going lower -- the PMIC cannot run below it.
+ */
 static struct mt_cpu_freq_info opp_tbl_L_e10_0[] = {
-	OP(2500000, 115000), /* new 2.5GHz top -> old 2nd-highest volt */
-	OP(2200000, 110000),
-	OP(2130000, 105625),
-	OP(2068000, 101875),
-	OP(2015000,  97500),
-	OP(1962000,  93750),
-	OP(1909000,  89375),
-	OP(1856000,  85000),
-	OP(1803000,  81250),
-	OP(1750000,  80000),
-	OP(1617000,  73750),
-	OP(1484000,  69375),
-	OP(1351000,  65625),
-	OP(1218000,  62500),
-	OP(1085000,  60000),
-	OP( 979000,  60000), /* lowest-2 kept at 0.6V floor (was 62500) */
-	OP( 900000,  60000),
+	OP(2500000, 110000), /* 120000 - 10000 */
+	OP(2200000, 105000), /* 115000 - 10000 */
+	OP(2130000, 100000), /* 110000 - 10000 */
+	OP(2068000,  95625), /* 105625 - 10000 */
+	OP(2015000,  91875), /* 101875 - 10000 */
+	OP(1962000,  87500), /*  97500 - 10000 */
+	OP(1909000,  83750), /*  93750 - 10000 */
+	OP(1856000,  79375), /*  89375 - 10000 */
+	OP(1803000,  75000), /*  85000 - 10000 */
+	OP(1750000,  71250), /*  81250 - 10000 */
+	OP(1617000,  70000), /*  80000 - 10000 */
+	OP(1484000,  63750), /*  73750 - 10000 */
+	OP(1351000,  60000), /*  69375 - 10000 -> clamped at PMIC floor */
+	OP(1218000,  60000), /*  65625 - 10000 -> clamped at PMIC floor */
+	OP(1085000,  60000), /*  62500 - 10000 -> clamped at PMIC floor */
+	OP( 900000,  60000), /*  60000 - 10000 -> clamped at PMIC floor */
 };
 static struct mt_cpu_freq_info opp_tbl_LL_e10_0[] = {
-	OP(1800000, 115000), /* new 1.8GHz top -> old 2nd-highest volt */
-	OP(1600000, 110000),
-	OP(1515000, 105625),
-	OP(1439000, 101875),
-	OP(1374000,  97500),
-	OP(1309000,  93750),
-	OP(1244000,  89375),
-	OP(1179000,  85000),
-	OP(1114000,  81250),
-	OP(1050000,  80000),
-	OP( 948000,  73750),
-	OP( 846000,  69375),
-	OP( 745000,  65625),
-	OP( 643000,  64375),
-	OP( 542000,  60000), /* shift reaches old lowest volt (400K) */
-	OP( 501000,  60000), /* lowest-2 kept at 0.6V floor (was 64375) */
-	OP( 400000,  60000),
+	OP(1800000, 110000), /* 120000 - 10000 */
+	OP(1600000, 105000), /* 115000 - 10000 */
+	OP(1515000, 100000), /* 110000 - 10000 */
+	OP(1439000,  95625), /* 105625 - 10000 */
+	OP(1374000,  91875), /* 101875 - 10000 */
+	OP(1309000,  87500), /*  97500 - 10000 */
+	OP(1244000,  83750), /*  93750 - 10000 */
+	OP(1179000,  79375), /*  89375 - 10000 */
+	OP(1114000,  75000), /*  85000 - 10000 */
+	OP(1050000,  71250), /*  81250 - 10000 */
+	OP( 948000,  70000), /*  80000 - 10000 */
+	OP( 846000,  63750), /*  73750 - 10000 */
+	OP( 745000,  60000), /*  69375 - 10000 -> clamped at PMIC floor */
+	OP( 643000,  60000), /*  65625 - 10000 -> clamped at PMIC floor */
+	OP( 542000,  60000), /*  64375 - 10000 -> clamped at PMIC floor */
+	OP( 400000,  60000), /*  60000 - 10000 -> clamped at PMIC floor */
 };
 OPP_TBL(CCI, C65X, 10, CCI); /* opp_tbl_CCI_e10_0 */
 
