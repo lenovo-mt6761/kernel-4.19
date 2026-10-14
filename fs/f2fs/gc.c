@@ -641,11 +641,6 @@ static bool is_alive(struct f2fs_sb_info *sbi, struct f2fs_summary *sum,
 		set_sbi_flag(sbi, SBI_NEED_FSCK);
 	}
 
-	if (f2fs_check_nid_range(sbi, dni->ino)) {
-		f2fs_put_page(node_page, 1);
-		return false;
-	}
-
 	*nofs = ofs_of_node(node_page);
 	source_blkaddr = data_blkaddr(NULL, node_page, ofs_in_node);
 	f2fs_put_page(node_page, 1);
@@ -863,14 +858,8 @@ static int move_data_block(struct inode *inode, block_t bidx,
 		}
 	}
 
-	/* allocate block address */
-	err = f2fs_allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
-				&sum, CURSEG_COLD_DATA, NULL, false);
-	if (err) {
-		f2fs_put_page(mpage, 1);
-		/* filesystem should shutdown, no need to recovery block */
-		goto up_out;
-	}
+	f2fs_allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
+					&sum, CURSEG_COLD_DATA, NULL, false);
 
 	fio.encrypted_page = f2fs_pagecache_get_page(META_MAPPING(fio.sbi),
 				newaddr, FGP_LOCK | FGP_CREAT, GFP_NOFS);
@@ -1077,8 +1066,7 @@ next_step:
 
 		if (phase == 3) {
 			inode = f2fs_iget(sb, dni.ino);
-			if (IS_ERR(inode) || is_bad_inode(inode) ||
-					special_file(inode->i_mode)) {
+			if (IS_ERR(inode) || is_bad_inode(inode)) {
 				set_sbi_flag(sbi, SBI_NEED_FSCK);
 				continue;
 			}
@@ -1126,10 +1114,8 @@ next_step:
 			int err;
 
 			if (S_ISREG(inode->i_mode)) {
-				if (!down_write_trylock(&fi->i_gc_rwsem[READ])) {
-					sbi->skipped_gc_rwsem++;
+				if (!down_write_trylock(&fi->i_gc_rwsem[READ]))
 					continue;
-				}
 				if (!down_write_trylock(
 						&fi->i_gc_rwsem[WRITE])) {
 					sbi->skipped_gc_rwsem++;
@@ -1303,9 +1289,6 @@ int f2fs_gc(struct f2fs_sb_info *sbi, bool sync,
 	unsigned long long last_skipped = sbi->skipped_atomic_files[FG_GC];
 	unsigned long long first_skipped;
 	unsigned int skipped_round = 0, round = 0;
-#if defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6885)
-	unsigned int upper_secs;
-#endif
 
 	trace_f2fs_gc_begin(sbi->sb, sync, background,
 				get_pages(sbi, F2FS_DIRTY_NODES),
@@ -1377,42 +1360,16 @@ gc_more:
 	if (has_not_enough_free_secs(sbi, sec_freed, 0)) {
 		if (skipped_round <= MAX_SKIP_GC_COUNT ||
 					skipped_round * 2 < round) {
-#if defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6885)
-			__get_secs_required(sbi, NULL, &upper_secs, NULL);
-			upper_secs += NR_GC_CHECKPOINT_SECS;
-
-			if (free_sections(sbi) <= upper_secs)
-				pr_info("%s: stop gc since free sections[0x%x] is less than 0x%x.\n",
-					__func__, free_sections(sbi), upper_secs);
-			else {
-				segno = NULL_SEGNO;
-				goto gc_more;
-			}
-#else
 			segno = NULL_SEGNO;
 			goto gc_more;
-#endif
 		}
 
 		if (first_skipped < last_skipped &&
 				(last_skipped - first_skipped) >
 						sbi->skipped_gc_rwsem) {
 			f2fs_drop_inmem_pages_all(sbi, true);
-#if defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6885)
-			__get_secs_required(sbi, NULL, &upper_secs, NULL);
-			upper_secs += NR_GC_CHECKPOINT_SECS;
-
-			if (free_sections(sbi) <= upper_secs)
-				pr_info("%s: stop gc since free sections[0x%x] is less than 0x%x.\n",
-					__func__, free_sections(sbi), upper_secs);
-			else {
-				segno = NULL_SEGNO;
-				goto gc_more;
-			}
-#else
 			segno = NULL_SEGNO;
 			goto gc_more;
-#endif
 		}
 		if (gc_type == FG_GC && !is_sbi_flag_set(sbi, SBI_CP_DISABLED))
 			ret = f2fs_write_checkpoint(sbi, &cpc);
