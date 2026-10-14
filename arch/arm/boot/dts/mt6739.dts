@@ -1564,7 +1564,7 @@
 	};
 
 	spi0: spi@1100a000 {
-		compatible = "mediatek,mt6765-spi";
+		compatible = "mediatek,mt6739-spi";
 		mediatek,pad-select = <0>;
 		reg = <0 0x1100a000 0 0x1000>;
 		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_LOW>;
@@ -1575,7 +1575,7 @@
 		};
 
 	spi1: spi@11010000 {
-		compatible = "mediatek,mt6765-spi";
+		compatible = "mediatek,mt6739-spi";
 		mediatek,pad-select = <0>;
 		reg = <0 0x11010000 0 0x1000>;
 		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_LOW>;
@@ -1586,7 +1586,7 @@
 	};
 
 	spi2: spi@11012000 {
-		compatible = "mediatek,mt6765-spi";
+		compatible = "mediatek,mt6739-spi";
 		mediatek,pad-select = <0>;
 		reg = <0 0x11012000 0 0x1000>;
 		interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_LOW>;
