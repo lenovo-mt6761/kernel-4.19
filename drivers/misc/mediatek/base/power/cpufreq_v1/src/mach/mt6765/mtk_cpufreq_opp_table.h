@@ -1261,8 +1261,50 @@ OPP_TBL(L,   C65OD, 9, L); /* opp_tbl_L_e9_0   */
 OPP_TBL(LL,  C65OD, 9, LL); /* opp_tbl_LL_e9_0  */
 OPP_TBL(CCI, C65OD, 9, CCI); /* opp_tbl_CCI_e9_0 */
 
-OPP_TBL(L,   C65X, 10, L); /* opp_tbl_L_e10_0   */
-OPP_TBL(LL,  C65X, 10, LL); /* opp_tbl_LL_e10_0  */
+/* TB301FU overclock + undervolt (alps-overclock):
+ * Perf(L) gains a 2500MHz top bin, Efficiency(LL) gains an 1800MHz top bin.
+ * Voltage rule: from the new highest freq, voltage is shifted down one gear
+ * (new top uses the old 2nd-highest voltage, etc.); the lowest 2 gears are
+ * held at the 60000 (0.6V) PMIC floor, which also drops the 979MHz bin from
+ * 62500 to 60000 -- a further power saving at the bottom. */
+static struct mt_cpu_freq_info opp_tbl_L_e10_0[] = {
+	OP(2500000, 115000), /* new 2.5GHz top -> old 2nd-highest volt */
+	OP(2200000, 110000),
+	OP(2130000, 105625),
+	OP(2068000, 101875),
+	OP(2015000,  97500),
+	OP(1962000,  93750),
+	OP(1909000,  89375),
+	OP(1856000,  85000),
+	OP(1803000,  81250),
+	OP(1750000,  80000),
+	OP(1617000,  73750),
+	OP(1484000,  69375),
+	OP(1351000,  65625),
+	OP(1218000,  62500),
+	OP(1085000,  60000),
+	OP( 979000,  60000), /* lowest-2 kept at 0.6V floor (was 62500) */
+	OP( 900000,  60000),
+};
+static struct mt_cpu_freq_info opp_tbl_LL_e10_0[] = {
+	OP(1800000, 115000), /* new 1.8GHz top -> old 2nd-highest volt */
+	OP(1600000, 110000),
+	OP(1515000, 105625),
+	OP(1439000, 101875),
+	OP(1374000,  97500),
+	OP(1309000,  93750),
+	OP(1244000,  89375),
+	OP(1179000,  85000),
+	OP(1114000,  81250),
+	OP(1050000,  80000),
+	OP( 948000,  73750),
+	OP( 846000,  69375),
+	OP( 745000,  65625),
+	OP( 643000,  64375),
+	OP( 542000,  60000), /* shift reaches old lowest volt (400K) */
+	OP( 501000,  60000), /* lowest-2 kept at 0.6V floor (was 64375) */
+	OP( 400000,  60000),
+};
 OPP_TBL(CCI, C65X, 10, CCI); /* opp_tbl_CCI_e10_0 */
 
 /* v1.2 */

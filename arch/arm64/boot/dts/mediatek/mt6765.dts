@@ -52,63 +52,67 @@ firmware_class.path=/vendor/firmware";
 		};
 		opp1 {
 			opp-hz = /bits/ 64 <979000000>;
-			opp-microvolt = <618750>;
+			opp-microvolt = <600000>;
 		};
 		opp2 {
 			opp-hz = /bits/ 64 <1085000000>;
-			opp-microvolt = <643750>;
+			opp-microvolt = <600000>;
 		};
 		opp3 {
 			opp-hz = /bits/ 64 <1218000000>;
-			opp-microvolt = <675000>;
+			opp-microvolt = <625000>;
 		};
 		opp4 {
 			opp-hz = /bits/ 64 <1351000000>;
-			opp-microvolt = <706250>;
+			opp-microvolt = <656250>;
 		};
 		opp5 {
 			opp-hz = /bits/ 64 <1484000000>;
-			opp-microvolt = <737500>;
+			opp-microvolt = <693750>;
 		};
 		opp6 {
 			opp-hz = /bits/ 64 <1617000000>;
-			opp-microvolt = <768750>;
+			opp-microvolt = <737500>;
 		};
 		opp7 {
 			opp-hz = /bits/ 64 <1750000000>;
 			opp-microvolt = <800000>;
 		};
 		opp8 {
-			opp-hz = /bits/ 64 <1814000000>;
-			opp-microvolt = <837500>;
+			opp-hz = /bits/ 64 <1803000000>;
+			opp-microvolt = <812500>;
 		};
 		opp9 {
-			opp-hz = /bits/ 64 <1879000000>;
-			opp-microvolt = <875000>;
+			opp-hz = /bits/ 64 <1856000000>;
+			opp-microvolt = <850000>;
 		};
 		opp10 {
-			opp-hz = /bits/ 64 <1944000000>;
-			opp-microvolt = <912500>;
+			opp-hz = /bits/ 64 <1909000000>;
+			opp-microvolt = <893750>;
 		};
 		opp11 {
-			opp-hz = /bits/ 64 <2009000000>;
-			opp-microvolt = <950000>;
+			opp-hz = /bits/ 64 <1962000000>;
+			opp-microvolt = <937500>;
 		};
 		opp12 {
-			opp-hz = /bits/ 64 <2074000000>;
-			opp-microvolt = <987500>;
+			opp-hz = /bits/ 64 <2015000000>;
+			opp-microvolt = <975000>;
 		};
 		opp13 {
-			opp-hz = /bits/ 64 <2139000000>;
-			opp-microvolt = <1025000>;
+			opp-hz = /bits/ 64 <2068000000>;
+			opp-microvolt = <1018750>;
 		};
 		opp14 {
-			opp-hz = /bits/ 64 <2215000000>;
-			opp-microvolt = <1068750>;
+			opp-hz = /bits/ 64 <2130000000>;
+			opp-microvolt = <1056250>;
 		};
 		opp15 {
-			opp-hz = /bits/ 64 <2301000000>;
-			opp-microvolt = <1118750>;
+			opp-hz = /bits/ 64 <2200000000>;
+			opp-microvolt = <1100000>;
+		};
+		opp16 {
+			opp-hz = /bits/ 64 <2500000000>;
+			opp-microvolt = <1150000>;
 		};
 	};
 
@@ -121,63 +125,67 @@ firmware_class.path=/vendor/firmware";
 		};
 		opp1 {
 			opp-hz = /bits/ 64 <501000000>;
-			opp-microvolt = <631250>;
+			opp-microvolt = <600000>;
 		};
 		opp2 {
 			opp-hz = /bits/ 64 <542000000>;
-			opp-microvolt = <643750>;
+			opp-microvolt = <600000>;
 		};
 		opp3 {
 			opp-hz = /bits/ 64 <643000000>;
-			opp-microvolt = <675000>;
+			opp-microvolt = <643750>;
 		};
 		opp4 {
 			opp-hz = /bits/ 64 <745000000>;
-			opp-microvolt = <706250>;
+			opp-microvolt = <656250>;
 		};
 		opp5 {
 			opp-hz = /bits/ 64 <846000000>;
-			opp-microvolt = <737500>;
+			opp-microvolt = <693750>;
 		};
 		opp6 {
 			opp-hz = /bits/ 64 <948000000>;
-			opp-microvolt = <768750>;
+			opp-microvolt = <737500>;
 		};
 		opp7 {
 			opp-hz = /bits/ 64 <1050000000>;
 			opp-microvolt = <800000>;
 		};
 		opp8 {
-			opp-hz = /bits/ 64 <1138000000>;
-			opp-microvolt = <837500>;
+			opp-hz = /bits/ 64 <1114000000>;
+			opp-microvolt = <812500>;
 		};
 		opp9 {
-			opp-hz = /bits/ 64 <1226000000>;
-			opp-microvolt = <875000>;
+			opp-hz = /bits/ 64 <1179000000>;
+			opp-microvolt = <850000>;
 		};
 		opp10 {
-			opp-hz = /bits/ 64 <1314000000>;
-			opp-microvolt = <912500>;
+			opp-hz = /bits/ 64 <1244000000>;
+			opp-microvolt = <893750>;
 		};
 		opp11 {
-			opp-hz = /bits/ 64 <1402000000>;
-			opp-microvolt = <950000>;
+			opp-hz = /bits/ 64 <1309000000>;
+			opp-microvolt = <937500>;
 		};
 		opp12 {
-			opp-hz = /bits/ 64 <1491000000>;
-			opp-microvolt = <987500>;
+			opp-hz = /bits/ 64 <1374000000>;
+			opp-microvolt = <975000>;
 		};
 		opp13 {
-			opp-hz = /bits/ 64 <1579000000>;
-			opp-microvolt = <1025000>;
+			opp-hz = /bits/ 64 <1439000000>;
+			opp-microvolt = <1018750>;
 		};
 		opp14 {
-			opp-hz = /bits/ 64 <1682000000>;
-			opp-microvolt = <1068740>;
+			opp-hz = /bits/ 64 <1515000000>;
+			opp-microvolt = <1056250>;
 		};
 		opp15 {
+			opp-hz = /bits/ 64 <1600000000>;
+			opp-microvolt = <1100000>;
+		};
+		opp16 {
 			opp-hz = /bits/ 64 <1800000000>;
-			opp-microvolt = <1118750>;
+			opp-microvolt = <1150000>;
 		};
 	};
 
