@@ -248,9 +248,8 @@ static int mt_charger_get_property(struct power_supply *psy,
 			pr_info("%s: Charger Type: CHARGER_UNKNOWN\n", __func__);
 			break;
 		default:
-			break;
-		}
 		break;
+	}
 	default:
 		return -EINVAL;
 	}

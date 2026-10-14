@@ -36,42 +36,42 @@
 #define bm_err(fmt, args...)   \
 do {\
 	if (bat_get_debug_level() >= BMLOG_ERROR_LEVEL) {\
-		pr_debug(fmt, ##args); \
+		pr_notice(fmt, ##args); \
 	} \
 } while (0)
 
 #define bm_warn(fmt, args...)   \
 do {\
 	if (bat_get_debug_level() >= BMLOG_WARNING_LEVEL) {\
-		pr_debug(fmt, ##args); \
+		pr_notice(fmt, ##args); \
 	}								   \
 } while (0)
 
 #define bm_notice(fmt, args...)   \
 do {\
 	if (bat_get_debug_level() >= BMLOG_NOTICE_LEVEL) {\
-		pr_debug(fmt, ##args); \
+		pr_notice(fmt, ##args); \
 	}								   \
 } while (0)
 
 #define bm_info(fmt, args...)   \
 do {\
 	if (bat_get_debug_level() >= BMLOG_INFO_LEVEL) {\
-		pr_debug(fmt, ##args); \
+		pr_notice(fmt, ##args); \
 	}								   \
 } while (0)
 
 #define bm_debug(fmt, args...)   \
 do {\
 	if (bat_get_debug_level() >= BMLOG_DEBUG_LEVEL) {\
-		pr_debug(fmt, ##args); \
+		pr_notice(fmt, ##args); \
 	}								   \
 } while (0)
 
 #define bm_trace(fmt, args...)\
 do {\
 	if (bat_get_debug_level() >= BMLOG_TRACE_LEVEL) {\
-		pr_debug(fmt, ##args);\
+		pr_notice(fmt, ##args);\
 	}						\
 } while (0)
 
@@ -733,7 +733,8 @@ struct simulator_log {
 #define SHUTDOWN_TIME 40
 #define AVGVBAT_ARRAY_SIZE 30
 #define INIT_VOLTAGE 3450
-#define BATTERY_SHUTDOWN_TEMPERATURE 65
+#define BATTERY_WARNING_TEMPERATURE  59
+#define BATTERY_SHUTDOWN_TEMPERATURE 60
 
 struct shutdown_condition {
 	bool is_overheat;
@@ -747,7 +748,6 @@ struct shutdown_controller {
 	struct alarm kthread_fgtimer;
 	bool timeout;
 	bool overheat;
-	bool overcold;
 	wait_queue_head_t  wait_que;
 	struct shutdown_condition shutdown_status;
 	struct timespec pre_time[SHUTDOWN_FACTOR_MAX];
@@ -828,6 +828,7 @@ struct mtk_battery {
 	/*battery status*/
 	int soc;
 	int ui_soc;
+	int maintenance_soc;
 	struct timespec uisoc_oldtime;
 	int d_saved_car;
 	int tbat_precise;

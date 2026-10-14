@@ -206,13 +206,6 @@ void fg_daemon_send_data(struct mtk_battery *gm,
 				struct fgd_cmd_param_t_custom),
 				prcv->total_size);
 			}
-			if ((prcv->idx + prcv->size) >
-				sizeof(struct fgd_cmd_param_t_custom)) {
-				bm_err("size is different %d size %d idx %d\n",
-					(int)sizeof(struct fgd_cmd_param_t_custom),
-					prcv->size, prcv->idx);
-				return;
-			}
 
 			ptr = (char *)&gm->fg_data;
 			memcpy(&ptr[prcv->idx],
@@ -264,16 +257,6 @@ void fg_daemon_get_data(int cmd,
 	{
 		char *ptr;
 
-		if (prcv->idx + prcv->size >
-			sizeof(struct fuel_gauge_custom_data)) {
-			bm_err("%s size is different %d %d %d\n",
-			__func__,
-			(int)sizeof(
-			struct fuel_gauge_custom_data),
-			prcv->idx, prcv->size);
-			return;
-		}
-
 		if (sizeof(struct fuel_gauge_custom_data)
 			!= prcv->total_size) {
 			bm_err("%s size is different %d %d\n",
@@ -301,16 +284,6 @@ void fg_daemon_get_data(int cmd,
 	case FG_DAEMON_CMD_GET_CUSTOM_TABLE:
 		{
 			char *ptr;
-
-			if (prcv->idx + prcv->size >
-				sizeof(struct fuel_gauge_table_custom_data)) {
-				bm_err("%s size is different %d %d %d\n",
-				__func__,
-				(int)sizeof(
-				struct fuel_gauge_table_custom_data),
-				prcv->idx, prcv->size);
-				return;
-			}
 
 			if (sizeof(struct fuel_gauge_table_custom_data)
 				!= prcv->total_size) {
@@ -1854,7 +1827,7 @@ static ssize_t FG_Battery_CurrentConsumption_show(
 {
 	int ret_value = 8888;
 
-	ret_value = gauge_get_int_property(GAUGE_PROP_BATTERY_CURRENT);// * 100;
+	ret_value = gauge_get_int_property(GAUGE_PROP_BATTERY_CURRENT) * 100;
 	bm_err("%s[EM] FG_Battery_CurrentConsumption : %d .1mA\n", __func__,
 		ret_value);
 
@@ -2205,10 +2178,7 @@ _out:
 	return ret;
 }
 
-
-
-
-
+int g_daemon_ui_soc = -1;
 
 static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 	struct fgd_nl_msg_t *ret_msg)
@@ -2217,6 +2187,8 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 	static int ptim_vbat, ptim_i;
 	int int_value;
 	static int badcmd;
+	struct power_supply *chg_psy = NULL;
+	union power_supply_propval prop;
 
 	if (gm == NULL)
 		gm = get_mtk_battery();
@@ -2358,10 +2330,24 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 		/* todo */
 		int is_charger_exist = 0;
 
+#if 0
 		if (gm->bs_data.bat_status == POWER_SUPPLY_STATUS_CHARGING)
 			is_charger_exist = true;
 		else
 			is_charger_exist = false;
+#else
+		chg_psy = devm_power_supply_get_by_phandle(&gm->gauge->pdev->dev, "charger");
+		if (IS_ERR_OR_NULL(chg_psy)) {
+			bm_err("%s Couldn't get chg_psy\n", __func__);
+			is_charger_exist = false;
+		} else {
+			power_supply_get_property(chg_psy, POWER_SUPPLY_PROP_ONLINE, &prop);
+			if (prop.intval)
+				is_charger_exist = true;
+			else
+				is_charger_exist = false;
+		}
+#endif
 
 		ret_msg->fgd_data_len += sizeof(is_charger_exist);
 		memcpy(ret_msg->fgd_data,
@@ -2527,10 +2513,6 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 
 		fg_coulomb = gauge_get_int_property(GAUGE_PROP_COULOMB);
 
-		if (((int)sizeof(msg->fgd_data[0])) == 0) {
-			bm_err("[fr] FG_DAEMON_CMD_SET_FG_BAT_INT1_GAP is not filled\n");
-			break;
-		}
 		memcpy(&gm->coulomb_int_gap,
 			&msg->fgd_data[0], sizeof(gm->coulomb_int_gap));
 
@@ -3091,6 +3073,7 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 			daemon_ui_soc = 0;
 		}
 
+		g_daemon_ui_soc = daemon_ui_soc;
 		gm->fg_cust_data.ui_old_soc = daemon_ui_soc;
 		old_uisoc = gm->ui_soc;
 
@@ -3733,19 +3716,18 @@ unsigned int TempConverBattThermistor(struct mtk_battery *gm, int temp)
 	unsigned int TBatt_R_Value = 0xffff;
 	struct fuelgauge_temperature *ptable;
 
-     int Temp_size =24;
 	ptable = gm->tmp_table;
 
 
-	if (temp >= ptable[Temp_size-1].BatteryTemp) {
-		TBatt_R_Value = ptable[Temp_size-1].TemperatureR;
+	if (temp >= ptable[20].BatteryTemp) {
+		TBatt_R_Value = ptable[20].TemperatureR;
 	} else if (temp <= ptable[0].BatteryTemp) {
 		TBatt_R_Value = ptable[0].TemperatureR;
 	} else {
 		RES1 = ptable[0].TemperatureR;
 		TMP1 = ptable[0].BatteryTemp;
 
-		for (i = 0; i <= (Temp_size-1); i++) { 
+		for (i = 0; i <= 20; i++) {
 			if (temp <= ptable[i].BatteryTemp) {
 				RES2 = ptable[i].TemperatureR;
 				TMP2 = ptable[i].BatteryTemp;

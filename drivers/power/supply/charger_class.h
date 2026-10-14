@@ -61,6 +61,7 @@ struct charger_ops {
 	/* enable/disable charger */
 	int (*enable)(struct charger_device *dev, bool en);
 	int (*is_enabled)(struct charger_device *dev, bool *en);
+	int (*enable_hz)(struct charger_device *dev, bool en);
 
 	/* enable/disable chip */
 	int (*enable_chip)(struct charger_device *dev, bool en);
@@ -188,6 +189,7 @@ static inline void *charger_get_data(
 }
 
 extern int charger_dev_enable(struct charger_device *charger_dev, bool en);
+extern int charger_dev_enable_hz(struct charger_device *charger_dev, bool en);
 extern int charger_dev_is_enabled(struct charger_device *charger_dev, bool *en);
 extern int charger_dev_plug_in(struct charger_device *charger_dev);
 extern int charger_dev_plug_out(struct charger_device *charger_dev);

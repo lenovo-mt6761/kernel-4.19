@@ -880,8 +880,10 @@ static int poll_interval_param_set(const char *val, const struct kernel_param *k
 		return ret;
 
 	mutex_lock(&bq27xxx_list_lock);
-	list_for_each_entry(di, &bq27xxx_battery_devices, list)
-		mod_delayed_work(system_wq, &di->work, 0);
+	list_for_each_entry(di, &bq27xxx_battery_devices, list) {
+		cancel_delayed_work_sync(&di->work);
+		schedule_delayed_work(&di->work, 0);
+	}
 	mutex_unlock(&bq27xxx_list_lock);
 
 	return ret;
@@ -926,7 +928,7 @@ static inline int bq27xxx_write(struct bq27xxx_device_info *di, int reg_index,
 		return -EINVAL;
 
 	if (!di->bus.write)
-		return -EOPNOTSUPP;
+		return -EPERM;
 
 	ret = di->bus.write(di, di->regs[reg_index], value, single);
 	if (ret < 0)
@@ -945,7 +947,7 @@ static inline int bq27xxx_read_block(struct bq27xxx_device_info *di, int reg_ind
 		return -EINVAL;
 
 	if (!di->bus.read_bulk)
-		return -EOPNOTSUPP;
+		return -EPERM;
 
 	ret = di->bus.read_bulk(di, di->regs[reg_index], data, len);
 	if (ret < 0)
@@ -964,7 +966,7 @@ static inline int bq27xxx_write_block(struct bq27xxx_device_info *di, int reg_in
 		return -EINVAL;
 
 	if (!di->bus.write_bulk)
-		return -EOPNOTSUPP;
+		return -EPERM;
 
 	ret = di->bus.write_bulk(di, di->regs[reg_index], data, len);
 	if (ret < 0)
@@ -1552,15 +1554,15 @@ static int bq27xxx_battery_read_health(struct bq27xxx_device_info *di)
 	return POWER_SUPPLY_HEALTH_GOOD;
 }
 
-static void bq27xxx_battery_update_unlocked(struct bq27xxx_device_info *di)
+void bq27xxx_battery_update(struct bq27xxx_device_info *di)
 {
 	struct bq27xxx_reg_cache cache = {0, };
 	bool has_ci_flag = di->opts & BQ27XXX_O_ZERO;
 	bool has_singe_flag = di->opts & BQ27XXX_O_ZERO;
 
 	cache.flags = bq27xxx_read(di, BQ27XXX_REG_FLAGS, has_singe_flag);
-	if (di->chip == BQ27000 && (cache.flags & 0xff) == 0xff)
-		cache.flags = -ENODEV; /* bq27000 hdq read error */
+	if ((cache.flags & 0xff) == 0xff)
+		cache.flags = -1; /* read error */
 	if (cache.flags >= 0) {
 		cache.temperature = bq27xxx_battery_read_temperature(di);
 		if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
@@ -1600,16 +1602,6 @@ static void bq27xxx_battery_update_unlocked(struct bq27xxx_device_info *di)
 		di->cache = cache;
 
 	di->last_update = jiffies;
-
-	if (!di->removed && poll_interval > 0)
-		mod_delayed_work(system_wq, &di->work, poll_interval * HZ);
-}
-
-void bq27xxx_battery_update(struct bq27xxx_device_info *di)
-{
-	mutex_lock(&di->lock);
-	bq27xxx_battery_update_unlocked(di);
-	mutex_unlock(&di->lock);
 }
 EXPORT_SYMBOL_GPL(bq27xxx_battery_update);
 
@@ -1620,6 +1612,9 @@ static void bq27xxx_battery_poll(struct work_struct *work)
 				     work.work);
 
 	bq27xxx_battery_update(di);
+
+	if (poll_interval > 0)
+		schedule_delayed_work(&di->work, poll_interval * HZ);
 }
 
 /*
@@ -1784,8 +1779,10 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 	union power_supply_propval type_val;
 #endif
 	mutex_lock(&di->lock);
-	if (time_is_before_jiffies(di->last_update + 5 * HZ))
-		bq27xxx_battery_update_unlocked(di);
+	if (time_is_before_jiffies(di->last_update + 5 * HZ)) {
+		cancel_delayed_work_sync(&di->work);
+		bq27xxx_battery_poll(&di->work.work);
+	}
 	mutex_unlock(&di->lock);
 
 #if defined(CONFIG_MACH_MT6893)
@@ -1798,22 +1795,21 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
 	}
 #endif
 	if (psp != POWER_SUPPLY_PROP_PRESENT && di->cache.flags < 0)
-		return di->cache.flags;
+		return -ENODEV;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		ret = bq27xxx_battery_status(di, val);
 #if defined(CONFIG_MACH_MT6893)
-		pr_info("gauge charger status(%d), charger online_val.intval(%d), type_val.intval(%d)",
-			val->intval, online_val.intval, type_val.intval);
+		pr_info("original charger status(%d)", val->intval);
 		if ((val->intval == POWER_SUPPLY_STATUS_DISCHARGING) ||
 			(val->intval == POWER_SUPPLY_STATUS_NOT_CHARGING) ||
 			(val->intval == POWER_SUPPLY_STATUS_UNKNOWN)) {
-			if (online_val.intval && (type_val.intval != 0))
+			if (online_val.intval && (type_val.intval != 0)) {
 				val->intval = POWER_SUPPLY_STATUS_CHARGING;
-		} else if ((val->intval == POWER_SUPPLY_STATUS_CHARGING) &&
-			!(online_val.intval) && !(type_val.intval)) {
-			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+				pr_info("update charger status(%d), online_val.intval(%d), type_val.intval(%d)",
+					val->intval,online_val.intval, type_val.intval);
+			}
 		}
 #endif
 		break;
@@ -1898,8 +1894,8 @@ static void bq27xxx_external_power_changed(struct power_supply *psy)
 {
 	struct bq27xxx_device_info *di = power_supply_get_drvdata(psy);
 
-	/* After charger plug in/out wait 0.5s for things to stabilize */
-	mod_delayed_work(system_wq, &di->work, HZ / 2);
+	cancel_delayed_work_sync(&di->work);
+	schedule_delayed_work(&di->work, 0);
 }
 
 int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
@@ -1955,18 +1951,22 @@ EXPORT_SYMBOL_GPL(bq27xxx_battery_setup);
 
 void bq27xxx_battery_teardown(struct bq27xxx_device_info *di)
 {
-	mutex_lock(&bq27xxx_list_lock);
-	list_del(&di->list);
-	mutex_unlock(&bq27xxx_list_lock);
-
-	/* Set removed to avoid bq27xxx_battery_update() re-queuing the work */
-	mutex_lock(&di->lock);
-	di->removed = true;
-	mutex_unlock(&di->lock);
+	/*
+	 * power_supply_unregister call bq27xxx_battery_get_property which
+	 * call bq27xxx_battery_poll.
+	 * Make sure that bq27xxx_battery_poll will not call
+	 * schedule_delayed_work again after unregister (which cause OOPS).
+	 */
+	poll_interval = 0;
 
 	cancel_delayed_work_sync(&di->work);
 
 	power_supply_unregister(di->bat);
+
+	mutex_lock(&bq27xxx_list_lock);
+	list_del(&di->list);
+	mutex_unlock(&bq27xxx_list_lock);
+
 	mutex_destroy(&di->lock);
 }
 EXPORT_SYMBOL_GPL(bq27xxx_battery_teardown);

@@ -6,6 +6,13 @@
 #ifndef _bq25601_SW_H_
 #define _bq25601_SW_H_
 
+#define BQ25601_DEBUG
+#ifdef BQ25601_DEBUG
+#define bq25601_dbg(x,y...) printk ("bq25601: " x, ## y)
+#else
+#define bq25601_dbg(x,y...) do { } while (0)
+#endif
+
 #define bq25601_CON0      0x00
 #define bq25601_CON1      0x01
 #define bq25601_CON2      0x02
@@ -16,9 +23,13 @@
 #define bq25601_CON7      0x07
 #define bq25601_CON8      0x08
 #define bq25601_CON9      0x09
-#define bq25601_CON10      0x0A
-#define	bq25601_CON11		0x0B
-#define bq25601_REG_NUM 12
+#define bq25601_CON10     0x0A
+#define bq25601_CON11     0x0B
+#define bq25601_CON12     0x0C
+#define bq25601_CON13     0x0D
+#define bq25601_CON14     0x0E
+#define bq25601_CON15     0x0F
+#define bq25601_REG_NUM   16
 
 /**********************************************************
  *
@@ -192,60 +203,11 @@
 #define CON11_Rev_MASK           0x03
 #define CON11_Rev_SHIFT          0
 
-/**********************************************************
- *
- *   [Extern Function]
- *
- *********************************************************/
-//CON0----------------------------------------------------
-extern void bq25601_set_en_hiz(unsigned int val);
-extern void bq25601_set_vindpm(unsigned int val);
-extern void bq25601_set_iinlim(unsigned int val);
-//CON1----------------------------------------------------
-extern void bq25601_set_reg_rst(unsigned int val);
-extern void bq25601_set_pfm(unsigned int val);
-extern void bq25601_set_wdt_rst(unsigned int val);
-extern void bq25601_set_chg_config(unsigned int val);
-extern void bq25601_set_otg_config(unsigned int val);
-extern void bq25601_set_sys_min(unsigned int val);
-extern void bq25601_set_boost_lim(unsigned int val);
-//CON2----------------------------------------------------
-extern void bq25601_set_ichg(unsigned int val);
-extern void bq25601_set_rdson(unsigned int val);
-extern void bq25601_set_force_20pct(unsigned int val);
-//CON3----------------------------------------------------
-extern void bq25601_set_iprechg(unsigned int val);
-extern void bq25601_set_iterm(unsigned int val);
-//CON4----------------------------------------------------
-extern void bq25601_set_vreg(unsigned int val);
-extern void bq25601_set_batlowv(unsigned int val);
-extern void bq25601_set_vrechg(unsigned int val);
-extern void bq25601_set_topoff_timer(unsigned int val);
-//CON5----------------------------------------------------
-extern void bq25601_set_en_term(unsigned int val);
-extern void bq25601_set_term_stat(unsigned int val);
-extern void bq25601_set_watchdog(unsigned int val);
-extern void bq25601_set_en_timer(unsigned int val);
-extern void bq25601_set_chg_timer(unsigned int val);
-//CON6----------------------------------------------------
-extern void bq25601_set_treg(unsigned int val);
-//CON7----------------------------------------------------
-extern void bq25601_set_tmr2x_en(unsigned int val);
-extern void bq25601_set_batfet_disable(unsigned int val);
-extern void bq25601_set_int_mask(unsigned int val);
-//CON8----------------------------------------------------
-extern unsigned int bq25601_get_system_status(void);
-extern unsigned int bq25601_get_vbus_stat(void);
-extern unsigned int bq25601_get_chrg_stat(void);
-extern unsigned int bq25601_get_vsys_stat(void);
-//---------------------------------------------------------
+//CON15
+#define CON15_ITRICKCHG_MASK   0x01
+#define CON15_ITRICKCHG_SHIFT  4
 
-extern unsigned int bq25601_reg_config_interface(unsigned char RegNum,
-		unsigned char val);
+#define SY6974_PART_NUM    0x09
 
-extern unsigned int bq25601_read_interface(unsigned char RegNum,
-		unsigned char *val, unsigned char MASK, unsigned char SHIFT);
-extern unsigned int bq25601_config_interface(unsigned char RegNum,
-		unsigned char val, unsigned char MASK, unsigned char SHIFT);
 #endif // _bq25601_SW_H_
 
