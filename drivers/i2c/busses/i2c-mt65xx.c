@@ -780,7 +780,6 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
 {
 	int ret;
 	int left_num = num;
-	bool write_then_read_en = false;
 	struct mtk_i2c *i2c = i2c_get_adapdata(adap);
 
 	ret = mtk_i2c_clock_enable(i2c);
@@ -794,7 +793,6 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
 		if (!(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
 		    msgs[0].addr == msgs[1].addr) {
 			i2c->auto_restart = 0;
-			write_then_read_en = true;
 		}
 	}
 
@@ -818,10 +816,12 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
 		else
 			i2c->op = I2C_MASTER_WR;
 
-		if (write_then_read_en) {
-			/* combined two messages into one transaction */
-			i2c->op = I2C_MASTER_WRRD;
-			left_num--;
+		if (!i2c->auto_restart) {
+			if (num > 1) {
+				/* combined two messages into one transaction */
+				i2c->op = I2C_MASTER_WRRD;
+				left_num--;
+			}
 		}
 
 		/* always use DMA mode. */
@@ -829,10 +829,7 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
 		if (ret < 0)
 			goto err_exit;
 
-		if (i2c->op == I2C_MASTER_WRRD)
-			msgs += 2;
-		else
-			msgs++;
+		msgs++;
 	}
 	/* the return value is number of executed messages */
 	ret = num;
@@ -929,7 +926,7 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 		return PTR_ERR(i2c->pdmabase);
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
+	if (irq <= 0)
 		return irq;
 
 	init_completion(&i2c->msg_complete);

@@ -10,21 +10,9 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 
-config MICROTRUST_TEE_LITE_SUPPORT
-	bool "Enable Microtrust TEEI LITE Support"
-	select VIRTIO
-	select GENERIC_ALLOCATOR
-	default n
-	---help---
-	  Enables the support of Microtrust TEE drivers for ARMv7.
-	  All Microtrust related TEE drivers will depend on this option.
-	  Say lite if you would like to enable this feature.
-	  If unsure, say N.
-
 config MICROTRUST_TEE_SUPPORT
 	bool "Enable Microtrust TEEI Support"
 	select DMA_SHARED_BUFFER
-	select VIRTIO
 	select GENERIC_ALLOCATOR
 	select MTK_TEE_SANITY
 	default n
@@ -36,7 +24,7 @@ config MICROTRUST_TEE_SUPPORT
 
 config MICROTRUST_TEE_VERSION
 	string "MICROTRUST TEE Version"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default "400"
 	help
 	  Enables the support of Microtrust new version.
@@ -46,7 +34,7 @@ config MICROTRUST_TEE_VERSION
 
 config MICROTRUST_TZ_DRIVER
 	tristate "Microtrust TEEI Driver"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default y
 	help
 	  Enables the support of Microtrust trustzone linux driver.
@@ -57,7 +45,7 @@ config MICROTRUST_TZ_DRIVER
 
 config MICROTRUST_DYNAMIC_CORE
 	tristate "Microtrust TEEI Dynamic Core"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default y
 	help
 	  Enables the support of Microtrust trustzone linux driver.
@@ -70,7 +58,7 @@ config MICROTRUST_TZ_DRIVER_MTK_BOOTPROF
 	bool "Enable MTK bootprof to track boot progress of TEEI"
 	depends on MICROTRUST_TZ_DRIVER
 	depends on MTPROF
-	default n
+	default y
 	help
 	  Enables the support of Mediatek bootprof feature in Microtrust
 	  tz_driver. This feature is for tracking boot progress by
@@ -91,7 +79,7 @@ config MICROTRUST_TZ_DRIVER_MTK_TRACING
 
 config MICROTRUST_VFS_DRIVER
 	tristate "Microtrust Virtual File System Driver"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default y
 	help
 	  Enables the support of Microtrust virtual file system driver.
@@ -102,7 +90,7 @@ config MICROTRUST_VFS_DRIVER
 
 config MICROTRUST_FP_DRIVER
 	tristate "Microtrust Fingerprint Driver"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default y
 	help
 	  Enables support of Microtrust fingerprint helper driver.
@@ -113,7 +101,7 @@ config MICROTRUST_FP_DRIVER
 
 config MICROTRUST_KEYMASTER_DRIVER
 	tristate "Microtrust keymaster Driver"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default y
 	help
 	  Enables support of Microtrust keymaster helper driver.
@@ -124,7 +112,7 @@ config MICROTRUST_KEYMASTER_DRIVER
 
 config MICROTRUST_DEBUG
 	bool "Enable Microtrust Debug Message"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default n
 	help
 	  Enable debug messages output from Microtrust Linux drivers.
@@ -134,7 +122,7 @@ config MICROTRUST_DEBUG
 
 config MICROTRUST_UNITTEST_SUPPORT
 	tristate "Microtrust Unittest Trigger Support"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default n
 	help
 	  Enable Microtrust unittest trigger driver.
@@ -145,8 +133,8 @@ config MICROTRUST_UNITTEST_SUPPORT
 
 config MICROTRUST_TZ_LOG
 	bool "Enable Microtrust TrustZone logger"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
-	default n
+	depends on MICROTRUST_TEE_SUPPORT
+	default y
 	help
 	  Enable Microtrust TrustZone logger to dump TEE logs in kernel log buffer.
 	  This driver will read out log buffer and direct to console each
@@ -156,7 +144,7 @@ config MICROTRUST_TZ_LOG
 
 config MICROTRUST_TEST_DRIVERS
 	tristate "Microtrust Test Drivers"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default n
 	help
 	  Enables support of Microtrust test driver kernel framework.
@@ -166,7 +154,7 @@ config MICROTRUST_TEST_DRIVERS
 
 config MICROTRUST_TZDRIVER_DYNAMICAL_DEBUG
 	tristate "Microtrust tzdriver dynamical debug"
-	depends on MICROTRUST_TEE_SUPPORT || MICROTRUST_TEE_LITE_SUPPORT
+	depends on MICROTRUST_TEE_SUPPORT
 	default n
 	help
 	  Enables support of Microtrust test driver kernel framework.

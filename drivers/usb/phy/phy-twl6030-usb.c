@@ -322,8 +322,9 @@ static int twl6030_set_vbus(struct phy_companion *comparator, bool enabled)
 
 static int twl6030_usb_probe(struct platform_device *pdev)
 {
+	u32 ret;
 	struct twl6030_usb	*twl;
-	int			status, err, ret;
+	int			status, err;
 	struct device_node	*np = pdev->dev.of_node;
 	struct device		*dev = &pdev->dev;
 
@@ -340,11 +341,6 @@ static int twl6030_usb_probe(struct platform_device *pdev)
 	twl->irq1		= platform_get_irq(pdev, 0);
 	twl->irq2		= platform_get_irq(pdev, 1);
 	twl->linkstat		= MUSB_UNKNOWN;
-
-	if (twl->irq1 < 0)
-		return twl->irq1;
-	if (twl->irq2 < 0)
-		return twl->irq2;
 
 	twl->comparator.set_vbus	= twl6030_set_vbus;
 	twl->comparator.start_srp	= twl6030_start_srp;

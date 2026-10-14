@@ -495,21 +495,15 @@ PVRSRV_ERROR InitCACHEBridge(void)
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_CACHE,
 			      PVRSRV_BRIDGE_CACHE_CACHEOPQUEUE,
-			      PVRSRVBridgeCacheOpQueue, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_CACHEOPQUEUE),
-			      sizeof(PVRSRV_BRIDGE_OUT_CACHEOPQUEUE));
+			      PVRSRVBridgeCacheOpQueue, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_CACHE,
 			      PVRSRV_BRIDGE_CACHE_CACHEOPEXEC,
-			      PVRSRVBridgeCacheOpExec, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_CACHEOPEXEC),
-			      sizeof(PVRSRV_BRIDGE_OUT_CACHEOPEXEC));
+			      PVRSRVBridgeCacheOpExec, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_CACHE,
 			      PVRSRV_BRIDGE_CACHE_CACHEOPLOG,
-			      PVRSRVBridgeCacheOpLog, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_CACHEOPLOG),
-			      sizeof(PVRSRV_BRIDGE_OUT_CACHEOPLOG));
+			      PVRSRVBridgeCacheOpLog, NULL);
 
 	return PVRSRV_OK;
 }

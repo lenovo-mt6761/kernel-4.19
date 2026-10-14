@@ -707,7 +707,7 @@ static int mma8452_write_raw(struct iio_dev *indio_dev,
 			     int val, int val2, long mask)
 {
 	struct mma8452_data *data = iio_priv(indio_dev);
-	int i, j, ret;
+	int i, ret;
 
 	ret = iio_device_claim_direct_mode(indio_dev);
 	if (ret)
@@ -767,17 +767,13 @@ static int mma8452_write_raw(struct iio_dev *indio_dev,
 		break;
 
 	case IIO_CHAN_INFO_OVERSAMPLING_RATIO:
-		j = mma8452_get_odr_index(data);
+		ret = mma8452_get_odr_index(data);
 
 		for (i = 0; i < ARRAY_SIZE(mma8452_os_ratio); i++) {
-			if (mma8452_os_ratio[i][j] == val) {
+			if (mma8452_os_ratio[i][ret] == val) {
 				ret = mma8452_set_power_mode(data, i);
 				break;
 			}
-		}
-		if (i == ARRAY_SIZE(mma8452_os_ratio)) {
-			ret = -EINVAL;
-			break;
 		}
 		break;
 	default:
@@ -1474,7 +1470,7 @@ static int mma8452_trigger_setup(struct iio_dev *indio_dev)
 	if (ret)
 		return ret;
 
-	indio_dev->trig = iio_trigger_get(trig);
+	indio_dev->trig = trig;
 
 	return 0;
 }
@@ -1490,14 +1486,10 @@ static int mma8452_reset(struct i2c_client *client)
 	int i;
 	int ret;
 
-	/*
-	 * Find on fxls8471, after config reset bit, it reset immediately,
-	 * and will not give ACK, so here do not check the return value.
-	 * The following code will read the reset register, and check whether
-	 * this reset works.
-	 */
-	i2c_smbus_write_byte_data(client, MMA8452_CTRL_REG2,
+	ret = i2c_smbus_write_byte_data(client,	MMA8452_CTRL_REG2,
 					MMA8452_CTRL_REG2_RST);
+	if (ret < 0)
+		return ret;
 
 	for (i = 0; i < 10; i++) {
 		usleep_range(100, 200);

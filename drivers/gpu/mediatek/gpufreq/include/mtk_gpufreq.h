@@ -75,6 +75,4 @@ extern void mt_gpufreq_power_limit_notify_registerCB(
 	gpufreq_power_limit_notify pCB);
 /* End of legacy APIs */
 
-extern struct mt_gpufreq_power_table_info *pass_gpu_table_to_eara(void);
-extern int mt_gpufreq_get_immed_gpu_temp(void);
 #endif /* _MT_GPUFREQ_H_ */

@@ -3714,11 +3714,14 @@ static int Ext_Speaker_Amp_Set(struct snd_kcontrol *kcontrol,
 		 ucontrol->value.integer.value[0]);
 	if (ucontrol->value.integer.value[0]) {
 /*AKITA-5 M8 audio bring up begin */
+/*
 #ifdef SND_SOC_AW87519
 		aw87519_amp_lch_on();
 		aw87519_amp_rch_on();
 #endif
+*/
 /*AKITA-5 - end */
+
 		Ext_Speaker_Amp_Change(true);
 		mCodec_data->mAudio_Ana_DevicePower
 			[AUDIO_ANALOG_DEVICE_OUT_EXTSPKAMP] =
@@ -3728,10 +3731,12 @@ static int Ext_Speaker_Amp_Set(struct snd_kcontrol *kcontrol,
 			[AUDIO_ANALOG_DEVICE_OUT_EXTSPKAMP] =
 		    ucontrol->value.integer.value[0];
 /*AKITA-5 M8 audio bring up begin */
+/*
 #ifdef SND_SOC_AW87519
 		aw87519_amp_lch_off();
 		aw87519_amp_rch_off();
 #endif
+*/
 /*AKITA-5 - end */
 
 		Ext_Speaker_Amp_Change(false);
@@ -5528,9 +5533,6 @@ static int Audio_Mic1_Mode_Select_Set(struct snd_kcontrol *kcontrol,
 		/* Audio L preamplifier DCCEN */
 		Ana_Set_Reg(AUDENC_ANA_CON0,
 			    0x1 << 1, 0x1 << 1);
-	} else {
-		Ana_Set_Reg(AUDENC_ANA_CON0,
-			    0x1 << 0, 0x1 << 1);
 	}
 	return 0;
 }
@@ -5557,9 +5559,6 @@ static int Audio_Mic2_Mode_Select_Set(struct snd_kcontrol *kcontrol,
 		/* Audio R preamplifier DCCEN */
 		Ana_Set_Reg(AUDENC_ANA_CON1,
 			    0x1 << 1, 0x1 << 1);
-	} else {
-		Ana_Set_Reg(AUDENC_ANA_CON1,
-			    0x1 << 0, 0x1 << 1);
 	}
 	return 0;
 }
@@ -6023,6 +6022,9 @@ static int dc_trim_thread(void *arg)
 	do_exit(0);
 	return 0;
 }
+#ifdef CONFIG_SND_SOC_AW87XXX
+extern int aw87xxx_add_codec_controls(void *codec);
+#endif
 static int mt6357_component_probe(struct snd_soc_component *component)
 {
 	int ret;
@@ -6039,6 +6041,14 @@ static int mt6357_component_probe(struct snd_soc_component *component)
 				   ARRAY_SIZE(mt6357_pmic_Test_controls));
 	snd_soc_add_component_controls(component, Audio_snd_auxadc_controls,
 				   ARRAY_SIZE(Audio_snd_auxadc_controls));
+	#ifdef CONFIG_SND_SOC_AW87XXX
+	ret = aw87xxx_add_codec_controls((void *)component);
+	pr_debug("%s() xxxxx chenfujun controls\n", __func__);
+	if (ret < 0) {
+		pr_err("%s: add_codec_controls failed, err %d\n",__func__, ret);
+		return ret;
+		};
+	#endif
 	/* here to set  private data */
 	mCodec_data = kzalloc(sizeof(struct mt6357_codec_priv), GFP_KERNEL);
 	if (!mCodec_data) {

@@ -1256,7 +1256,6 @@ config SND_SOC_WM8993
 
 config SND_SOC_WM8994
 	tristate
-	depends on MFD_WM8994
 
 config SND_SOC_WM8995
 	tristate
@@ -1458,5 +1457,5 @@ config SND_SOC_SMARTPAINFO
 	  If unsure, say N.
 
 source "sound/soc/codecs/cs35l43/Kconfig"
-
+source "sound/soc/codecs/aw87390/Kconfig"
 endmenu

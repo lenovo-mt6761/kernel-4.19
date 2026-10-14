@@ -538,11 +538,7 @@ PVRSRV_ERROR DIReadEntryKM(DI_CONTEXT *psContext, const IMG_CHAR *pszEntryPath,
 
 	/* increment ref count on the context so that it doesn't get freed
 	 * before it gets processed by the writer thread. */
-	if (OSAtomicAddUnless(&psContext->iRefCnt, 1, IMG_INT32_MAX) == IMG_INT32_MAX)
-	{
-		/* Job is not scheduled to the writer queue; there are too many waiting. */
-		PVR_LOG_GOTO_WITH_ERROR("OSAtomicAddUnless", eError, PVRSRV_ERROR_REFCOUNT_OVERFLOW, overflow_);
-	}
+	OSAtomicIncrement(&psContext->iRefCnt);
 
 	OSLockAcquire(_g_psImpl->psWriterLock);
 	dllist_add_to_head(&_g_psImpl->sWriterQueue, &psItem->sQueueElement);
@@ -555,7 +551,6 @@ PVRSRV_ERROR DIReadEntryKM(DI_CONTEXT *psContext, const IMG_CHAR *pszEntryPath,
 
 free_item_:
 	eError = PVRSRV_ERROR_NOT_FOUND;
-overflow_:
 	OSFreeMemNoStats(psItem);
 return_:
 	return eError;

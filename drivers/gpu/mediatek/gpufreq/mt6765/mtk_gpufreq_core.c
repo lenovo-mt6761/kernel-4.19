@@ -247,11 +247,6 @@ phys_addr_t gpu_fdvfs_virt_addr; /* for GED, legacy ?! */
  * ===============================================
  */
 
-struct mt_gpufreq_power_table_info *pass_gpu_table_to_eara(void)
-{
-	return g_power_table;
-}
-
 /*
  * API : handle frequency change request
  */
@@ -609,12 +604,6 @@ unsigned int mt_gpufreq_get_min_power(void)
 	if (!g_power_table)
 		return 0;
 	return g_power_table[g_opp_idx_num - 1].gpufreq_power;
-}
-
-/* API : get immediate gpu temperature */
-int mt_gpufreq_get_immed_gpu_temp(void)
-{
-	return get_immediate_gpu_wrap();
 }
 
 /* API : get static leakage power */

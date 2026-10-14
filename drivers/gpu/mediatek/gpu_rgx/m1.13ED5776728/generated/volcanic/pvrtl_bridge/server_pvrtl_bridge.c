@@ -245,16 +245,17 @@ TLOpenStream_exit:
 			PVR_ASSERT((eError == PVRSRV_OK)
 				   || (eError == PVRSRV_ERROR_RETRY));
 
+			/* Avoid freeing/destroying/releasing the resource a second time below */
+			psSDInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psHandleBase);
 
 		}
 
-		else if (psSDInt)
+		if (psSDInt)
 		{
 			TLServerCloseStreamKM(psSDInt);
 		}
-
 	}
 
 	/* Allocated space should be equal to the last updated offset */
@@ -867,51 +868,35 @@ PVRSRV_ERROR InitPVRTLBridge(void)
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLOPENSTREAM,
-			      PVRSRVBridgeTLOpenStream, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLOPENSTREAM),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLOPENSTREAM));
+			      PVRSRVBridgeTLOpenStream, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLCLOSESTREAM,
-			      PVRSRVBridgeTLCloseStream, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLCLOSESTREAM),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLCLOSESTREAM));
+			      PVRSRVBridgeTLCloseStream, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLACQUIREDATA,
-			      PVRSRVBridgeTLAcquireData, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLACQUIREDATA),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLACQUIREDATA));
+			      PVRSRVBridgeTLAcquireData, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLRELEASEDATA,
-			      PVRSRVBridgeTLReleaseData, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLRELEASEDATA),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLRELEASEDATA));
+			      PVRSRVBridgeTLReleaseData, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLDISCOVERSTREAMS,
-			      PVRSRVBridgeTLDiscoverStreams, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLDISCOVERSTREAMS),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLDISCOVERSTREAMS));
+			      PVRSRVBridgeTLDiscoverStreams, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLRESERVESTREAM,
-			      PVRSRVBridgeTLReserveStream, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLRESERVESTREAM),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLRESERVESTREAM));
+			      PVRSRVBridgeTLReserveStream, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLCOMMITSTREAM,
-			      PVRSRVBridgeTLCommitStream, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLCOMMITSTREAM),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLCOMMITSTREAM));
+			      PVRSRVBridgeTLCommitStream, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_PVRTL,
 			      PVRSRV_BRIDGE_PVRTL_TLWRITEDATA,
-			      PVRSRVBridgeTLWriteData, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_TLWRITEDATA),
-			      sizeof(PVRSRV_BRIDGE_OUT_TLWRITEDATA));
+			      PVRSRVBridgeTLWriteData, NULL);
 
 	return PVRSRV_OK;
 }

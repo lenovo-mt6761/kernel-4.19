@@ -225,43 +225,6 @@ PVRSRV_ERROR PVRSRVSetDeviceDefaultPowerState(PCPVRSRV_DEVICE_NODE psDeviceNode,
 	return PVRSRV_OK;
 }
 
-static PVRSRV_ERROR PVRSRVSetDeviceCurrentPowerState(PVRSRV_POWER_DEV *psPowerDevice,
-                                                   PVRSRV_DEV_POWER_STATE eNewPowerState)
-{
-#if defined(SUPPORT_PMR_DEFERRED_FREE)
-	PVRSRV_DEVICE_NODE *psDeviceNode;
-	PVRSRV_DEV_POWER_STATE eOldPowerState;
-#endif
-
-	if (psPowerDevice == NULL)
-	{
-		return PVRSRV_ERROR_INVALID_DEVICE;
-	}
-
-#if !defined(SUPPORT_PMR_DEFERRED_FREE)
-	OSAtomicWrite(&psPowerDevice->eCurrentPowerState, eNewPowerState);
-#else
-	eOldPowerState = OSAtomicExchange(&psPowerDevice->eCurrentPowerState,
-	                                  eNewPowerState);
-
-	psDeviceNode = psPowerDevice->hDevCookie;
-	PVR_ASSERT(psDeviceNode);
-
-	if (eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF &&
-	    eNewPowerState != eOldPowerState)
-	{
-		psDeviceNode->uiPowerOffCounter = psDeviceNode->uiPowerOffCounterNext;
-
-		/* It's not really important to know if any zombies were queued. */
-		(void) PMRQueueZombiesForCleanup(psDeviceNode);
-
-		psDeviceNode->uiPowerOffCounterNext++;
-	}
-#endif
-
-	return PVRSRV_OK;
-}
-
 /*
  @Input       pfnPowerLockAcquire  : Function to re-acquire power-lock in-case
                                      it was necessary to release it.
@@ -507,7 +470,7 @@ PVRSRV_ERROR PVRSRVDevicePostPowerStateKM(PVRSRV_POWER_DEV			*psPowerDevice,
 							 eNewPowerState == PVRSRV_DEV_POWER_STATE_ON,
 							 IMG_FALSE);
 
-	PVRSRVSetDeviceCurrentPowerState(psPowerDevice, eNewPowerState);
+	OSAtomicWrite(&psPowerDevice->eCurrentPowerState, eNewPowerState);
 
 	return PVRSRV_OK;
 }
@@ -784,7 +747,7 @@ PVRSRV_ERROR PVRSRVRegisterPowerDevice(PPVRSRV_DEVICE_NODE psDeviceNode,
 	psPowerDevice->pfnGPUUnitsPowerChange = pfnGPUUnitsPowerChange;
 	psPowerDevice->hSysData = psDeviceNode->psDevConfig->hSysData;
 	psPowerDevice->hDevCookie = hDevCookie;
-	PVRSRVSetDeviceCurrentPowerState(psPowerDevice, eCurrentPowerState);
+	OSAtomicWrite(&psPowerDevice->eCurrentPowerState, eCurrentPowerState);
 	psPowerDevice->eDefaultPowerState = eDefaultPowerState;
 
 	psDeviceNode->psPowerDev = psPowerDevice;

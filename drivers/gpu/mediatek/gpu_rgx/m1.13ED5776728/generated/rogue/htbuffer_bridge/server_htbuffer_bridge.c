@@ -339,15 +339,11 @@ PVRSRV_ERROR InitHTBUFFERBridge(void)
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_HTBUFFER,
 			      PVRSRV_BRIDGE_HTBUFFER_HTBCONTROL,
-			      PVRSRVBridgeHTBControl, pHTBUFFERBridgeLock,
-			      sizeof(PVRSRV_BRIDGE_IN_HTBCONTROL),
-			      sizeof(PVRSRV_BRIDGE_OUT_HTBCONTROL));
+			      PVRSRVBridgeHTBControl, pHTBUFFERBridgeLock);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_HTBUFFER,
 			      PVRSRV_BRIDGE_HTBUFFER_HTBLOG, PVRSRVBridgeHTBLog,
-			      pHTBUFFERBridgeLock,
-			      sizeof(PVRSRV_BRIDGE_IN_HTBLOG),
-			      sizeof(PVRSRV_BRIDGE_OUT_HTBLOG));
+			      pHTBUFFERBridgeLock);
 
 	return PVRSRV_OK;
 }

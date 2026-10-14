@@ -711,11 +711,7 @@ static int uas_queuecommand_lck(struct scsi_cmnd *cmnd,
 	 * of queueing, no matter how fatal the error
 	 */
 	if (err == -ENODEV) {
-		if (cmdinfo->state & (COMMAND_INFLIGHT | DATA_IN_URB_INFLIGHT |
-				DATA_OUT_URB_INFLIGHT))
-			goto out;
-
-		cmnd->result = DID_NO_CONNECT << 16;
+		cmnd->result = DID_ERROR << 16;
 		cmnd->scsi_done(cmnd);
 		goto zombie;
 	}
@@ -728,7 +724,6 @@ static int uas_queuecommand_lck(struct scsi_cmnd *cmnd,
 		uas_add_work(cmdinfo);
 	}
 
-out:
 	devinfo->cmnd[idx] = cmnd;
 zombie:
 	spin_unlock_irqrestore(&devinfo->lock, flags);

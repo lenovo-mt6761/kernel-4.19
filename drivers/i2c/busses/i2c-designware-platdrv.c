@@ -365,7 +365,6 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 
 exit_probe:
 	dw_i2c_plat_pm_cleanup(dev);
-	i2c_dw_prepare_clk(dev, false);
 exit_reset:
 	if (!IS_ERR_OR_NULL(dev->rst))
 		reset_control_assert(dev->rst);

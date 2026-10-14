@@ -27,7 +27,7 @@
 #include <dt-bindings/iio/mt635x-auxadc.h>
 #include <mt-plat/aee.h>
 
-#define AUXADC_DEBUG			0
+#define AUXADC_DEBUG			1
 #define AUXADC_RDY_BIT			BIT(15)
 
 #define AUXADC_DEF_R_RATIO		1
@@ -98,7 +98,7 @@ struct auxadc_channels {
  */
 static struct auxadc_channels auxadc_chans[] = {
 	MT635x_AUXADC_CHANNEL(BATADC, 0, 15, true),
-	MT635x_AUXADC_CHANNEL(ISENSE, 0, 15, true),
+	MT635x_AUXADC_CHANNEL(ISENSE, 1, 15, true),
 	MT635x_AUXADC_CHANNEL(VCDT, 2, 12, true),
 	MT635x_AUXADC_CHANNEL(BAT_TEMP, 3, 12, true),
 	MT635x_AUXADC_CHANNEL(BATID, 3, 12, true),
@@ -322,6 +322,26 @@ static void auxadc_reset(struct mt635x_auxadc_device *adc_dev)
 	dev_info(adc_dev->dev, "reset AUXADC done\n");
 }
 
+static void auxadc_debug_dump(struct mt635x_auxadc_device *adc_dev,
+			      int timeout_times)
+{
+	int i = 0, len = 0;
+	unsigned char reg_log[631] = "", reg_str[21] = "";
+	unsigned int reg_val = 0;
+
+	for (i = 0; i < adc_dev->info->num_dbg_regs; i++) {
+		regmap_read(adc_dev->regmap,
+			    adc_dev->info->dbg_regs[i], &reg_val);
+		len += snprintf(reg_str, 20, "Reg[0x%x]=0x%x,",
+				adc_dev->info->dbg_regs[i], reg_val);
+		strncat(reg_log, reg_str, ARRAY_SIZE(reg_log) - 1);
+	}
+	if (len)
+		dev_notice(adc_dev->dev,
+			   "(%s)Time out!(%d) %s\n"
+			   , __func__, timeout_times, reg_log);
+}
+
 static void imp_timeout_handler(struct mt635x_auxadc_device *adc_dev,
 				bool is_timeout)
 {
@@ -332,6 +352,7 @@ static void imp_timeout_handler(struct mt635x_auxadc_device *adc_dev,
 		return;
 	}
 	timeout_times++;
+	auxadc_debug_dump(adc_dev, timeout_times);
 	if (timeout_times == 5)
 		auxadc_reset(adc_dev);
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
@@ -350,6 +371,7 @@ static void auxadc_timeout_handler(struct mt635x_auxadc_device *adc_dev,
 		return;
 	}
 	timeout_times++;
+	auxadc_debug_dump(adc_dev, timeout_times);
 	if (timeout_times == 11)
 		auxadc_reset(adc_dev);
 }
@@ -715,16 +737,16 @@ static int auxadc_get_rac(struct mt635x_auxadc_device *adc_dev)
 				ret = rac * 1;
 			if (ret < 50) {
 				ret = -1;
-				pr_debug("bypass due to Rac < 50mOhm\n");
+				pr_info("bypass due to Rac < 50mOhm\n");
 			}
 		} else {
 			ret = -1;
-			pr_debug("bypass due to c_diff < 70mA\n");
+			pr_info("bypass due to c_diff < 70mA\n");
 		}
-		pr_debug("v1=%d,v2=%d,c1=%d,c2=%d,v_diff=%d,c_diff=%d\n",
+		pr_info("v1=%d,v2=%d,c1=%d,c2=%d,v_diff=%d,c_diff=%d\n",
 			vbat_1, vbat_2, ibat_1, ibat_2,
 			(vbat_1 - vbat_2), (ibat_2 - ibat_1));
-		pr_debug("rac=%d,ret=%d,retry=%d\n",
+		pr_info("rac=%d,ret=%d,retry=%d\n",
 			rac, ret, retry_count);
 
 		if (++retry_count >= 3)
@@ -923,7 +945,7 @@ int auxadc_priv_read_channel(struct mt635x_auxadc_device *adc_dev,
 
 	ret = get_auxadc_out(adc_dev, auxadc_chan, &val);
 	if (ret < 0)
-		pr_debug("%s ret=%d\n", __func__, ret);
+		pr_info("%s ret=%d\n", __func__, ret);
 	val = val * auxadc_chan->r_ratio[0] * VOLT_FULL;
 	val = (val / auxadc_chan->r_ratio[1]) >> auxadc_chan->res;
 
@@ -959,16 +981,17 @@ static int wk_bat_temp_dbg(struct mt635x_auxadc_device *adc_dev,
 	unsigned short i;
 
 	vbif28 = auxadc_priv_read_channel(adc_dev, AUXADC_VBIF);
-	pr_debug("BAT_TEMP_PREV:%d,BAT_TEMP:%d,VBIF28:%d\n",
+	pr_notice("BAT_TEMP_PREV:%d,BAT_TEMP:%d,VBIF28:%d\n",
 		bat_temp_prev, bat_temp, vbif28);
 	if (bat_temp < 200 || abs(bat_temp_prev - bat_temp) > 100) {
+		auxadc_debug_dump(adc_dev, 0);
 		for (i = 0; i < 5; i++) {
 			arr_bat_temp[i] =
 				auxadc_priv_read_channel(adc_dev,
 							 AUXADC_BAT_TEMP);
 		}
 		bat_temp_new = bat_temp_filter(arr_bat_temp, 5);
-		pr_debug("%d,%d,%d,%d,%d, BAT_TEMP_NEW:%d\n",
+		pr_notice("%d,%d,%d,%d,%d, BAT_TEMP_NEW:%d\n",
 			  arr_bat_temp[0], arr_bat_temp[1], arr_bat_temp[2],
 			  arr_bat_temp[3], arr_bat_temp[4], bat_temp_new);
 
@@ -980,11 +1003,11 @@ static int wk_bat_temp_dbg(struct mt635x_auxadc_device *adc_dev,
 			arr_bat_temp[i] =
 				auxadc_priv_read_channel(adc_dev,
 							 AUXADC_BAT_TEMP);
-			pr_debug("[CH3_DBG] %d,%d\n",
+			pr_notice("[CH3_DBG] %d,%d\n",
 				  bat, arr_bat_temp[i]);
 		}
 		bat_temp_new = bat_temp_filter(arr_bat_temp, 5);
-		pr_debug("Final BAT_TEMP_NEW:%d\n", bat_temp_new);
+		pr_notice("Final BAT_TEMP_NEW:%d\n", bat_temp_new);
 	}
 	return bat_temp_new;
 }
@@ -1007,7 +1030,7 @@ static int mt635x_bat_temp_cali(struct mt635x_auxadc_device *adc_dev,
 	if (bat_temp < 200 || abs(bat_temp_prev - bat_temp) > 100) {
 		/* dump debug log when BAT_TEMP being abnormal */
 		bat_temp = wk_bat_temp_dbg(adc_dev, bat_temp_prev, bat_temp);
-		pr_debug("PMIC AUXADC BAT_TEMP aee_count=%d\n", aee_count);
+		pr_notice("PMIC AUXADC BAT_TEMP aee_count=%d\n", aee_count);
 		aee_count++;
 	} else if (dbg_count % 50 == 0) {
 		/* dump debug log in normal case */
@@ -1045,16 +1068,16 @@ static int auxadc_cali_imix_r(struct mt635x_auxadc_device *dev)
 		adc_dev = dev;
 		return 0;
 	} else if (!adc_dev) {
-		pr_debug("%s NULL adc_dev, skip\n",
+		pr_info("%s NULL adc_dev, skip\n",
 			__func__);
 		return -EINVAL;
 	} else if (!get_mtk_gauge_psy()) {
-		pr_debug("%s gauge disabled, skip\n",
+		pr_info("%s gauge disabled, skip\n",
 			__func__);
 		return -ENODEV;
 	} else if (cur_uisoc < 0 ||
 		   cur_uisoc == pre_uisoc) {
-		pr_debug("%s pre_SOC=%d SOC=%d, skip\n",
+		pr_info("%s pre_SOC=%d SOC=%d, skip\n",
 			__func__, pre_uisoc, cur_uisoc);
 		return 0;
 	}
@@ -1066,7 +1089,7 @@ static int auxadc_cali_imix_r(struct mt635x_auxadc_device *dev)
 			return -EIO;
 	}
 	imix_r_avg = imix_r_avg / IMIX_R_CALI_CNT;
-	pr_debug("[%s] %d,%d,ravg:%d\n",
+	pr_info("[%s] %d,%d,ravg:%d\n",
 		__func__, rac_val[0], rac_val[1], imix_r_avg);
 
 	if (imix_r_avg > IMIX_R_MIN_MOHM)
@@ -1087,26 +1110,6 @@ static int auxadc_init_imix_r(struct mt635x_auxadc_device *adc_dev,
 		dev_notice(adc_dev->dev, "no imix_r, ret=%d\n", ret);
 	adc_dev->imix_r = (int)val;
 	auxadc_cali_imix_r(adc_dev);
-	return 0;
-}
-
-static int pmic_auxadc_suspend(struct platform_device *pdev, pm_message_t state)
-{
-#if defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6779)
-	struct mt6397_chip *chip = dev_get_drvdata(pdev->dev.parent);
-	/* enable MDRT when suspend */
-	regmap_write(chip->regmap, MT6359_AUXADC_MDRT_2, 0x4);
-#endif
-	return 0;
-}
-
-static int pmic_auxadc_resume(struct platform_device *pdev)
-{
-#if defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6779)
-	struct mt6397_chip *chip = dev_get_drvdata(pdev->dev.parent);
-	/* disable MDRT when resume */
-	regmap_write(chip->regmap, MT6359_AUXADC_MDRT_2, 0);
-#endif
 	return 0;
 }
 
@@ -1248,13 +1251,6 @@ static int mt635x_auxadc_probe(struct platform_device *pdev)
 		return ret;
 	}
 	register_syscore_ops(&auxadc_syscore_ops);
-#if defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6779)
-	/* disable MDRT */
-	regmap_write(adc_dev->regmap, MT6359_AUXADC_MDRT_2, 0);
-
-	/* set MDRT_WAKEUP AVG_NUM to the same with Ch7(128 samples) */
-	regmap_write(adc_dev->regmap, MT6359_AUXADC_CON10, 0x2637);
-#endif
 #if AUXADC_DEBUG
 	switch (chip->chip_id) {
 	case MT6357_CHIP_ID:
@@ -1294,8 +1290,6 @@ static struct platform_driver mt635x_auxadc_driver = {
 		.of_match_table = mt635x_auxadc_of_match,
 	},
 	.probe	= mt635x_auxadc_probe,
-	.suspend = pmic_auxadc_suspend,
-	.resume =  pmic_auxadc_resume,
 };
 module_platform_driver(mt635x_auxadc_driver);
 

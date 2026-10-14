@@ -1094,101 +1094,71 @@ PVRSRV_ERROR InitSRVCOREBridge(void)
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_CONNECT,
-			      PVRSRVBridgeConnect, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_CONNECT),
-			      sizeof(PVRSRV_BRIDGE_OUT_CONNECT));
+			      PVRSRVBridgeConnect, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_DISCONNECT,
-			      PVRSRVBridgeDisconnect, NULL, 0,
-			      sizeof(PVRSRV_BRIDGE_OUT_DISCONNECT));
+			      PVRSRVBridgeDisconnect, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_ACQUIREGLOBALEVENTOBJECT,
-			      PVRSRVBridgeAcquireGlobalEventObject, NULL, 0,
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_ACQUIREGLOBALEVENTOBJECT));
+			      PVRSRVBridgeAcquireGlobalEventObject, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_RELEASEGLOBALEVENTOBJECT,
-			      PVRSRVBridgeReleaseGlobalEventObject, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_RELEASEGLOBALEVENTOBJECT),
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_RELEASEGLOBALEVENTOBJECT));
+			      PVRSRVBridgeReleaseGlobalEventObject, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_EVENTOBJECTOPEN,
-			      PVRSRVBridgeEventObjectOpen, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_EVENTOBJECTOPEN),
-			      sizeof(PVRSRV_BRIDGE_OUT_EVENTOBJECTOPEN));
+			      PVRSRVBridgeEventObjectOpen, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_EVENTOBJECTWAIT,
-			      PVRSRVBridgeEventObjectWait, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_EVENTOBJECTWAIT),
-			      sizeof(PVRSRV_BRIDGE_OUT_EVENTOBJECTWAIT));
+			      PVRSRVBridgeEventObjectWait, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_EVENTOBJECTCLOSE,
-			      PVRSRVBridgeEventObjectClose, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_EVENTOBJECTCLOSE),
-			      sizeof(PVRSRV_BRIDGE_OUT_EVENTOBJECTCLOSE));
+			      PVRSRVBridgeEventObjectClose, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_DUMPDEBUGINFO,
-			      PVRSRVBridgeDumpDebugInfo, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_DUMPDEBUGINFO),
-			      sizeof(PVRSRV_BRIDGE_OUT_DUMPDEBUGINFO));
+			      PVRSRVBridgeDumpDebugInfo, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_GETDEVCLOCKSPEED,
-			      PVRSRVBridgeGetDevClockSpeed, NULL, 0,
-			      sizeof(PVRSRV_BRIDGE_OUT_GETDEVCLOCKSPEED));
+			      PVRSRVBridgeGetDevClockSpeed, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_HWOPTIMEOUT,
-			      PVRSRVBridgeHWOpTimeout, NULL, 0,
-			      sizeof(PVRSRV_BRIDGE_OUT_HWOPTIMEOUT));
+			      PVRSRVBridgeHWOpTimeout, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_ALIGNMENTCHECK,
-			      PVRSRVBridgeAlignmentCheck, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_ALIGNMENTCHECK),
-			      sizeof(PVRSRV_BRIDGE_OUT_ALIGNMENTCHECK));
+			      PVRSRVBridgeAlignmentCheck, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_GETDEVICESTATUS,
-			      PVRSRVBridgeGetDeviceStatus, NULL, 0,
-			      sizeof(PVRSRV_BRIDGE_OUT_GETDEVICESTATUS));
+			      PVRSRVBridgeGetDeviceStatus, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_GETMULTICOREINFO,
-			      PVRSRVBridgeGetMultiCoreInfo, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_GETMULTICOREINFO),
-			      sizeof(PVRSRV_BRIDGE_OUT_GETMULTICOREINFO));
+			      PVRSRVBridgeGetMultiCoreInfo, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_EVENTOBJECTWAITTIMEOUT,
-			      PVRSRVBridgeEventObjectWaitTimeout, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_EVENTOBJECTWAITTIMEOUT),
-			      sizeof(PVRSRV_BRIDGE_OUT_EVENTOBJECTWAITTIMEOUT));
+			      PVRSRVBridgeEventObjectWaitTimeout, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_FINDPROCESSMEMSTATS,
-			      PVRSRVBridgeFindProcessMemStats, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_FINDPROCESSMEMSTATS),
-			      sizeof(PVRSRV_BRIDGE_OUT_FINDPROCESSMEMSTATS));
+			      PVRSRVBridgeFindProcessMemStats, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_ACQUIREINFOPAGE,
-			      PVRSRVBridgeAcquireInfoPage, NULL, 0,
-			      sizeof(PVRSRV_BRIDGE_OUT_ACQUIREINFOPAGE));
+			      PVRSRVBridgeAcquireInfoPage, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_SRVCORE,
 			      PVRSRV_BRIDGE_SRVCORE_RELEASEINFOPAGE,
-			      PVRSRVBridgeReleaseInfoPage, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_RELEASEINFOPAGE),
-			      sizeof(PVRSRV_BRIDGE_OUT_RELEASEINFOPAGE));
+			      PVRSRVBridgeReleaseInfoPage, NULL);
 
 	return PVRSRV_OK;
 }

@@ -49,7 +49,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxdefs_km.h"
 #include "dllist.h"
 #include "rgx_hwperf.h"
-#include "rgxheapconfig.h"
 
 
 /*************************************************************************/ /*!

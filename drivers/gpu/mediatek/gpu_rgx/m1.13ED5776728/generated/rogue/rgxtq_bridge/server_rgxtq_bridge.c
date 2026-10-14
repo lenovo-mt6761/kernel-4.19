@@ -329,16 +329,17 @@ RGXCreateTransferContext_exit:
 			PVR_ASSERT((eError == PVRSRV_OK)
 				   || (eError == PVRSRV_ERROR_RETRY));
 
+			/* Avoid freeing/destroying/releasing the resource a second time below */
+			psTransferContextInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psHandleBase);
 
 		}
 
-		else if (psTransferContextInt)
+		if (psTransferContextInt)
 		{
 			PVRSRVRGXDestroyTransferContextKM(psTransferContextInt);
 		}
-
 	}
 
 	/* Allocated space should be equal to the last updated offset */
@@ -1346,40 +1347,23 @@ PVRSRV_ERROR InitRGXTQBridge(void)
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTQ,
 			      PVRSRV_BRIDGE_RGXTQ_RGXCREATETRANSFERCONTEXT,
-			      PVRSRVBridgeRGXCreateTransferContext, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_RGXCREATETRANSFERCONTEXT),
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_RGXCREATETRANSFERCONTEXT));
+			      PVRSRVBridgeRGXCreateTransferContext, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTQ,
 			      PVRSRV_BRIDGE_RGXTQ_RGXDESTROYTRANSFERCONTEXT,
-			      PVRSRVBridgeRGXDestroyTransferContext, NULL,
-			      sizeof
-			      (PVRSRV_BRIDGE_IN_RGXDESTROYTRANSFERCONTEXT),
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_RGXDESTROYTRANSFERCONTEXT));
+			      PVRSRVBridgeRGXDestroyTransferContext, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTQ,
 			      PVRSRV_BRIDGE_RGXTQ_RGXSETTRANSFERCONTEXTPRIORITY,
-			      PVRSRVBridgeRGXSetTransferContextPriority, NULL,
-			      sizeof
-			      (PVRSRV_BRIDGE_IN_RGXSETTRANSFERCONTEXTPRIORITY),
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_RGXSETTRANSFERCONTEXTPRIORITY));
+			      PVRSRVBridgeRGXSetTransferContextPriority, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTQ,
 			      PVRSRV_BRIDGE_RGXTQ_RGXSUBMITTRANSFER2,
-			      PVRSRVBridgeRGXSubmitTransfer2, NULL,
-			      sizeof(PVRSRV_BRIDGE_IN_RGXSUBMITTRANSFER2),
-			      sizeof(PVRSRV_BRIDGE_OUT_RGXSUBMITTRANSFER2));
+			      PVRSRVBridgeRGXSubmitTransfer2, NULL);
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTQ,
 			      PVRSRV_BRIDGE_RGXTQ_RGXSETTRANSFERCONTEXTPROPERTY,
-			      PVRSRVBridgeRGXSetTransferContextProperty, NULL,
-			      sizeof
-			      (PVRSRV_BRIDGE_IN_RGXSETTRANSFERCONTEXTPROPERTY),
-			      sizeof
-			      (PVRSRV_BRIDGE_OUT_RGXSETTRANSFERCONTEXTPROPERTY));
+			      PVRSRVBridgeRGXSetTransferContextProperty, NULL);
 
 	return PVRSRV_OK;
 }

@@ -1235,7 +1235,7 @@ SyncCheckpointAlloc(PSYNC_CHECKPOINT_CONTEXT psSyncContext,
 	                            hFence,
 	                            psNewSyncCheckpoint->ui32FWAddr,
 	                            psNewSyncCheckpoint->azName,
-	                            OSStringLength(psNewSyncCheckpoint->azName));
+	                            sizeof(psNewSyncCheckpoint->azName));
 
 	if (GetInfoPageDebugFlagsKM() & DEBUG_FEATURE_FULL_SYNC_TRACKING_ENABLED)
 	{

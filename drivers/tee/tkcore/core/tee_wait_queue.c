@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2015-2019 TrustKernel Incorporated
- * All Rights Reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
  */
 
 #include <linux/types.h>
@@ -64,10 +54,9 @@ void tee_wait_queue_sleep(struct device *dev,
 			struct tee_wait_queue_private *priv, u32 key)
 {
 	struct tee_wait_queue *w = tee_wait_queue_get(dev, priv, key);
-	if (!w) {
-		pr_err("tkcoredrv: wq_sleep: bad key %u\n", key);
+
+	if (!w)
 		return;
-	}
 
 	wait_for_completion(&w->comp);
 	mutex_lock(&priv->mu);
@@ -80,18 +69,11 @@ EXPORT_SYMBOL(tee_wait_queue_sleep);
 void tee_wait_queue_wakeup(struct device *dev,
 			struct tee_wait_queue_private *priv, u32 key)
 {
-	struct tee_wait_queue *w;
-	while (key) {
-		unsigned int idx;
-		idx = __builtin_ffs(key) - 1;
+	struct tee_wait_queue *w = tee_wait_queue_get(dev, priv, key);
 
-		key &= ~(1U << idx);
-		w = tee_wait_queue_get(dev, priv, idx);
-		if (!w) {
-			pr_err("tkcoredrv: wq_wake: unknown key %u:%u\n", key, idx);
-			continue;
-		}
-		complete(&w->comp);
-	}
+	if (!w)
+		return;
+
+	complete(&w->comp);
 }
 EXPORT_SYMBOL(tee_wait_queue_wakeup);

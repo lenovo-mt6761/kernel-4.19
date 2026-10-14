@@ -155,8 +155,7 @@ PVRSRV_ERROR TLAllocSharedMemIfNull(IMG_HANDLE hStream)
 	                            PVRSRV_MEMALLOCFLAG_GPU_READABLE |
 	                            PVRSRV_MEMALLOCFLAG_CPU_WRITE_COMBINE |
 	                            PVRSRV_MEMALLOCFLAG_KERNEL_CPU_MAPPABLE |
-	                            PVRSRV_MEMALLOCFLAG_CPU_LOCAL| /* TL for now is only used by host driver, so cpulocal mem suffices */
-	                            PVRSRV_MEMALLOCFLAG_ZERO_ON_ALLOC;
+	                            PVRSRV_MEMALLOCFLAG_CPU_LOCAL; /* TL for now is only used by host driver, so cpulocal mem suffices */
 
 	/* Exit if memory has already been allocated. */
 	if (psStream->pbyBuffer != NULL)

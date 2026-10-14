@@ -97,12 +97,6 @@ typedef struct _pvr_ion_stats_buf_ {
 	/* Size of the buffer */
 	size_t         uiBytes;
 
-#if defined(SUPPORT_PMR_DEFERRED_FREE)
-	/* Indicate if buffer is a zombie buffer (marked for free but free is
-	 * asynchronous) */
-	IMG_BOOL       bZombie;
-#endif
-
 	/* used for debugging */
 	struct task_struct *psTask;
 
@@ -147,7 +141,7 @@ static PVR_ION_STATS_STATE gPvrIonStatsState = {
 		  !defined(ION_HAS_QUERY_HEAPS_KERNEL) */
 };
 
-static IMG_BOOL isIonBuf(const struct dma_buf *psDmaBuf)
+static IMG_BOOL isIonBuf(struct dma_buf *psDmaBuf)
 {
 	if (!strcmp(psDmaBuf->exp_name, ION_DMA_BUF_EXP_NAME))
 		return IMG_TRUE;
@@ -242,12 +236,6 @@ static int pvr_ion_stats_show(OSDI_IMPL_ENTRY *s, void *v)
 
 		if (entry->ui32HeapKey != psHeap->ui32HashKey)
 			continue;
-
-#if defined(SUPPORT_PMR_DEFERRED_FREE)
-		/* treat zombie buffers as non-existent */
-		if (entry->bZombie)
-			continue;
-#endif
 
 		if (entry->psTask) {
 			get_task_comm(task_comm, entry->psTask);
@@ -559,59 +547,3 @@ void PVRSRVIonRemoveMemAllocRecord(struct dma_buf *psDmaBuf)
 out:
 	OSLockRelease(psState->hBuffersLock);
 }
-
-#if defined(SUPPORT_PMR_DEFERRED_FREE)
-void PVRSRVIonZombifyMemAllocRecord(const struct dma_buf *psDmaBuf)
-{
-	PVR_ION_STATS_STATE *psState = &gPvrIonStatsState;
-	PVR_ION_STATS_BUF *psBuf;
-
-	if (!psDmaBuf) {
-		PVR_DPF((PVR_DBG_ERROR, "Invalid dma buffer"));
-		return;
-	}
-
-	/* We're only interested in ION buffers */
-	if (isIonBuf(psDmaBuf) == IMG_FALSE)
-		return;
-
-	OSLockAcquire(psState->hBuffersLock);
-	psBuf = GetBuf(&psState->buffers, (uintptr_t)psDmaBuf);
-	if (!psBuf) {
-		PVR_DPF((PVR_DBG_ERROR, "Failed to find dma buffer"));
-		goto out;
-	}
-
-	psBuf->bZombie = IMG_TRUE;
-
-out:
-	OSLockRelease(psState->hBuffersLock);
-}
-
-void PVRSRVIonReviveMemAllocRecord(const struct dma_buf *psDmaBuf)
-{
-	PVR_ION_STATS_STATE *psState = &gPvrIonStatsState;
-	PVR_ION_STATS_BUF *psBuf;
-
-	if (!psDmaBuf) {
-		PVR_DPF((PVR_DBG_ERROR, "Invalid dma buffer"));
-		return;
-	}
-
-	/* We're only interested in ION buffers */
-	if (isIonBuf(psDmaBuf) == IMG_FALSE)
-		return;
-
-	OSLockAcquire(psState->hBuffersLock);
-	psBuf = GetBuf(&psState->buffers, (uintptr_t)psDmaBuf);
-	if (!psBuf) {
-		PVR_DPF((PVR_DBG_ERROR, "Failed to find dma buffer"));
-		goto out;
-	}
-
-	psBuf->bZombie = IMG_FALSE;
-
-out:
-	OSLockRelease(psState->hBuffersLock);
-}
-#endif

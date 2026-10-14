@@ -2553,7 +2553,7 @@ static struct attribute_group aw883xx_attribute_group = {
  * i2c driver
  *
  ******************************************************/
-int aw883xx_i2c_probe(struct i2c_client *i2c,
+static int aw883xx_i2c_probe(struct i2c_client *i2c,
 				const struct i2c_device_id *id)
 {
 	struct aw883xx *aw883xx = NULL;
@@ -2639,7 +2639,7 @@ err_sysfs:
 	return ret;
 }
 
-int aw883xx_i2c_remove(struct i2c_client *i2c)
+static int aw883xx_i2c_remove(struct i2c_client *i2c)
 {
 	struct aw883xx *aw883xx = i2c_get_clientdata(i2c);
 
@@ -2673,6 +2673,49 @@ int aw883xx_i2c_remove(struct i2c_client *i2c)
 
 	return 0;
 }
+
+static const struct i2c_device_id aw883xx_i2c_id[] = {
+	{AW883XX_I2C_NAME, 0},
+	{}
+};
+
+MODULE_DEVICE_TABLE(i2c, aw883xx_i2c_id);
+
+static struct of_device_id aw883xx_dt_match[] = {
+	{.compatible = "awinic,aw883xx_smartpa"},
+	{},
+};
+
+static struct i2c_driver aw883xx_i2c_driver = {
+	.driver = {
+		.name = AW883XX_I2C_NAME,
+		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(aw883xx_dt_match),
+	},
+	.probe = aw883xx_i2c_probe,
+	.remove = aw883xx_i2c_remove,
+	.id_table = aw883xx_i2c_id,
+};
+
+static int __init aw883xx_i2c_init(void)
+{
+	int ret = -1;
+
+	aw_pr_info("aw883xx driver version %s", AW883XX_DRIVER_VERSION);
+
+	ret = i2c_add_driver(&aw883xx_i2c_driver);
+	if (ret)
+		aw_pr_err("fail to add aw883xx device into i2c");
+
+	return ret;
+}
+module_init(aw883xx_i2c_init);
+
+static void __exit aw883xx_i2c_exit(void)
+{
+	i2c_del_driver(&aw883xx_i2c_driver);
+}
+module_exit(aw883xx_i2c_exit);
 
 MODULE_DESCRIPTION("ASoC AW883XX Smart PA Driver");
 MODULE_LICENSE("GPL v2");

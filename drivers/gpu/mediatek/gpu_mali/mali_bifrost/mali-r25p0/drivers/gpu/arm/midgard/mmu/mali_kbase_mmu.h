@@ -23,8 +23,6 @@
 #ifndef _KBASE_MMU_H_
 #define _KBASE_MMU_H_
 
-#define KBASE_MMU_PAGE_ENTRIES 512
-
 /**
  * kbase_mmu_init - Initialise an object representing GPU page tables
  *
