@@ -285,7 +285,19 @@ unsigned long schedutil_cpu_util(int cpu, unsigned long util_cfs,
 	unsigned long dl_util, util, irq;
 	struct rq *rq = cpu_rq(cpu);
 
-	if (!uclamp_is_used() &&
+	/*
+	 * TB301FU: keep the 4.19.191 vendor-BSP semantics for RT tasks.
+	 *
+	 * Upstream later replaced the SUGOV_RT_MAX_FREQ sched_feat gate with
+	 * "!uclamp_is_used()".  On this device userspace never touches uclamp
+	 * (the static key stays off), so the upstream condition is always true
+	 * and *any* runnable RT task on a CPU would force the policy to the
+	 * maximum frequency.  The vendor BSP gates this on
+	 * IS_BUILTIN(CONFIG_UCLAMP_TASK), which is =y here, so with UCLAMP
+	 * built in RT load is instead folded into the aggregate utilization --
+	 * matching the stock boot image behaviour.
+	 */
+	if (sched_feat(SUGOV_RT_MAX_FREQ) && !IS_BUILTIN(CONFIG_UCLAMP_TASK) &&
 	    type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt)) {
 		return max;
 	}

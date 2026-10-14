@@ -1350,54 +1350,40 @@ stop_charging:
 
 static bool charger_init_algo(struct mtk_charger *info)
 {
+	static const char * const alg_names[MAX_ALG_NO] = {
+		"pe4", "pd", "pe2", "pe"
+	};
 	struct chg_alg_device *alg;
-	int idx = 0;
+	int idx;
 
-	alg = get_chg_alg_by_name("pe4");
-	info->alg[idx] = alg;
-	if (alg == NULL)
-		chr_err("get pe4 fail\n");
-	else {
-		chr_err("get pe4 success\n");
+	/*
+	 * charger_init_algo() is retried every 5s until the primary
+	 * charger device shows up, so each algorithm must only be
+	 * initialized and registered once. Registering the same
+	 * notifier_block on the same chain a second time links it to
+	 * itself (n->next = n), and the third registration then walks
+	 * that corrupted chain forever, hanging charger_thread and
+	 * burning a CPU core.
+	 */
+	for (idx = 0; idx < MAX_ALG_NO && alg_names[idx]; idx++) {
+		if (info->alg_nb_registered[idx]) {
+			chr_err("alg %s already registered, skip init\n",
+				alg_names[idx]);
+			continue;
+		}
+
+		alg = get_chg_alg_by_name(alg_names[idx]);
+		info->alg[idx] = alg;
+		if (alg == NULL) {
+			chr_err("get %s fail\n", alg_names[idx]);
+			continue;
+		}
+
+		chr_err("get %s success\n", alg_names[idx]);
 		alg->config = info->config;
 		chg_alg_init_algo(alg);
 		register_chg_alg_notifier(alg, &info->chg_alg_nb);
-	}
-	idx++;
-
-	alg = get_chg_alg_by_name("pd");
-	info->alg[idx] = alg;
-	if (alg == NULL)
-		chr_err("get pd fail\n");
-	else {
-		chr_err("get pd success\n");
-		alg->config = info->config;
-		chg_alg_init_algo(alg);
-		register_chg_alg_notifier(alg, &info->chg_alg_nb);
-	}
-	idx++;
-
-	alg = get_chg_alg_by_name("pe2");
-	info->alg[idx] = alg;
-	if (alg == NULL)
-		chr_err("get pe2 fail\n");
-	else {
-		chr_err("get pe2 success\n");
-		alg->config = info->config;
-		chg_alg_init_algo(alg);
-		register_chg_alg_notifier(alg, &info->chg_alg_nb);
-	}
-	idx++;
-
-	alg = get_chg_alg_by_name("pe");
-	info->alg[idx] = alg;
-	if (alg == NULL)
-		chr_err("get pe fail\n");
-	else {
-		chr_err("get pe success\n");
-		alg->config = info->config;
-		chg_alg_init_algo(alg);
-		register_chg_alg_notifier(alg, &info->chg_alg_nb);
+		info->alg_nb_registered[idx] = true;
 	}
 
 	info->chg1_dev = get_charger_by_name("primary_chg");

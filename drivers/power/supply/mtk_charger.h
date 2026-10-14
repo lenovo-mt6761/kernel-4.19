@@ -325,6 +325,7 @@ struct mtk_charger {
 
 	struct chg_alg_device *alg[MAX_ALG_NO];
 	struct notifier_block chg_alg_nb;
+	bool alg_nb_registered[MAX_ALG_NO];
 	bool enable_hv_charging;
 
 	/* water detection */
