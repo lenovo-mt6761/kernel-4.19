@@ -151,14 +151,14 @@
 	};
 	camera_pins_cam_ldo_sub_vcama_0: cam1@vcama0 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO169__FUNC_GPIO169>;
+			pinmux = <PINMUX_GPIO166__FUNC_GPIO166>;
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	camera_pins_cam_ldo_sub_vcama_1: cam1@vcama1 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO169__FUNC_GPIO169>;
+			pinmux = <PINMUX_GPIO166__FUNC_GPIO166>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -257,7 +257,7 @@
 /* CAMERA specify sensor */
 
 &kd_camera_hw1 {
-	cam0_enable_sensor = "gc5035_mipi_raw hi556_mipi_raw";
-	cam1_enable_sensor = "gc2375h_mipi_raw";
+	cam0_enable_sensor = "sc501cs_lycn_i_mipi_raw sc501cs_txd_ii_mipi_raw gc08a3_mipi_raw hi556_mipi_raw";
+	cam1_enable_sensor = "gc02m1_mipi_raw sc201cs_mipi_raw sc202cs_mipi_raw";
 };
 /* CAMERA GPIO end */

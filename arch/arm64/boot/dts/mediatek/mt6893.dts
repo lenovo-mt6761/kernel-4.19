@@ -14,7 +14,6 @@
 #include <dt-bindings/pinctrl/mt6885-pinfunc.h>
 #include <dt-bindings/clock/mt6893-clk.h>
 #include <dt-bindings/reset/ti-syscon.h>
-#include <dt-bindings/mmc/mt6885-msdc.h>
 #include <dt-bindings/soc/mediatek,boot-mode.h>
 #include <dt-bindings/spmi/spmi.h>
 #include <dt-bindings/phy/phy.h>
@@ -3733,11 +3732,6 @@ page_owner=on loop.max_part=7";
 	irq_nfc: irq_nfc {
 		compatible = "mediatek,irq_nfc-eint";
 	};
-
-	mtee_svp: mtee_svp {
-		compatible = "medaitek,svp";
-	};
-	/* svp end */
 
 	mdp_mutex: mdp_mutex@1f001000 {
 		compatible = "mediatek,mdp_mutex";
@@ -8744,6 +8738,11 @@ page_owner=on loop.max_part=7";
 #include "mediatek/mt6359p.dtsi"
 #include "mediatek/cust_mt6893_msdc.dtsi"
 #include "mediatek/v1/mt6360_pd.dtsi"
+
+&mt_pmic_vemc_ldo_reg {
+	regulator-min-microvolt = <2500000>;
+	regulator-max-microvolt = <2500000>;
+};
 
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"

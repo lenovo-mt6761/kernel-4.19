@@ -2689,7 +2689,7 @@ page_owner=on loop.max_part=7";
 	/* SW mode: 0, Half-HW mode: 1, HW mode: 2 */
 		mediatek,refclk_ctrl = <2>;
 		vcc-supply = <&mt_pmic_vemc_ldo_reg>;
-		vcc-fixed-regulator;
+		vccq2-supply = <&mt_pmic_vufs_ldo_reg>;
 	};
 
 	md_ccif2@1023d000 {
@@ -3789,11 +3789,6 @@ page_owner=on loop.max_part=7";
 	irq_nfc: irq_nfc {
 		compatible = "mediatek,irq_nfc-eint";
 	};
-
-	mtee_svp: mtee_svp {
-		compatible = "medaitek,svp";
-	};
-	/* svp end */
 
 	mdp_mutex: mdp_mutex@1f001000 {
 		compatible = "mediatek,mdp_mutex";
@@ -8550,6 +8545,11 @@ page_owner=on loop.max_part=7";
 #include "mediatek/mt6359p.dtsi"
 #include "mediatek/cust_mt6885_msdc.dtsi"
 #include "mediatek/v1/mt6360_pd.dtsi"
+
+&mt_pmic_vemc_ldo_reg {
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+};
 
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"

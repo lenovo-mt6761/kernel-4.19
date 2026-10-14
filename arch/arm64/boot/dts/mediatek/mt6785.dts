@@ -942,7 +942,6 @@ page_owner=on loop.max_part=7";
 		mediatek,md_id = <0>;
 		mediatek,ap_plat_info = <6785>;
 		mediatek,md_generation = <6295>;
-		mediatek,offset_apon_md1 = <0x1c24>;
 		mediatek,cldma_capability = <6>;
 		reg = <0 0x10209000 0 0x1000>, /*AP_CCIF_BASE*/
 			<0 0x1020a000 0 0x1000>; /*MD_CCIF_BASE*/
@@ -4886,11 +4885,6 @@ page_owner=on loop.max_part=7";
 		mt6382_nfc_srclk = <&pio 25 0x0>;
 		status = "okay";
 	};
-
-	mtee_svp: mtee_svp {
-		compatible = "medaitek,svp";
-	};
-	/* svp end */
 
 	disp_ovl0@14008000 {
 		compatible = "mediatek,disp_ovl0";

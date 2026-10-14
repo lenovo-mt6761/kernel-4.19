@@ -175,15 +175,14 @@
 
 	camera_pins_cam_ldo_sub_vcama_0: cam1@vcama0 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO169__FUNC_GPIO169>;
+			pinmux = <PINMUX_GPIO166__FUNC_GPIO166>;
 			slew-rate = <1>;
 			output-low;
 		};
 	};
-
 	camera_pins_cam_ldo_sub_vcama_1: cam1@vcama1 {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO169__FUNC_GPIO169>;
+			pinmux = <PINMUX_GPIO166__FUNC_GPIO166>;
 			slew-rate = <1>;
 			output-high;
 		};

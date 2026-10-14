@@ -1662,11 +1662,6 @@
 		compatible = "mediatek,irq_nfc-eint";
 	};
 
-	mtee_svp: mtee_svp {
-		compatible = "medaitek,svp";
-	};
-	/* svp end */
-
 	gpio_usage_mapping:gpio_usage_mapping {
 		compatible = "mediatek,gpio_usage_mapping";
 	};
@@ -2549,7 +2544,7 @@
 						<0 0>;
 
 		vcc-supply = <&mt_pmic_vemc_ldo_reg>;
-		vcc-fixed-regulator;
+		vccq2-supply = <&mt_pmic_vufs_ldo_reg>;
 
 		resets = <&infracfg_rst 0>, <&infracfg_rst 1>,
 				 <&infracfg_rst 2>;
@@ -3287,13 +3282,6 @@
                 efuse_segment: segment@78 {
                         reg = <0x78 0x4>;
                 };
-				u3_phy_data: u3_phy_data {
-					reg = <0x1ac 0x4>;
-				};
-
-				u2_phy_data: u2_phy_data {
-					reg = <0x1b0 0x4>;
-				};
         };
 
 	dcm: dcm@10001000 {
@@ -6148,20 +6136,12 @@
 			mediatek,host-eye-term = <6>; /* 0~7 */
 			mediatek,host-eye-rev6 = <1>; /* 0~3 */
 			mediatek,host-eye-disc = <7>; /* 0~8 */
-			mediatek,rx-sqth = <0x5>;
-			mediatek,rev4 = <0x1>;
-			nvmem-cells = <&u2_phy_data>;
-			nvmem-cell-names = "intr_cal";
-			nvmem-cell-masks = <0x1f>;
 			status = "okay";
 		};
 
 		u3port0: usb3-phy0@11e40700 {
 			reg = <0 0x11e40700 0 0x900>;
 			#phy-cells = <1>;
-			nvmem-cells = <&u3_phy_data>, <&u3_phy_data>, <&u3_phy_data>;
-			nvmem-cell-names = "iext_intr_ctrl", "rx_impsel", "tx_impsel";
-			nvmem-cell-masks = <0x3f0000 0x1f00 0x1f>;
 			status = "okay";
 		};
 	};
@@ -6858,3 +6838,7 @@
 #endif
 #include "mediatek/cust_mt6877_connfem.dtsi"
 
+&mt_pmic_vemc_ldo_reg {
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+};

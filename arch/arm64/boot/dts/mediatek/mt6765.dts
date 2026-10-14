@@ -107,7 +107,7 @@ firmware_class.path=/vendor/firmware";
 			opp-microvolt = <1068750>;
 		};
 		opp15 {
-			opp-hz = /bits/ 64 <2600000000>;
+			opp-hz = /bits/ 64 <2301000000>;
 			opp-microvolt = <1118750>;
 		};
 	};
@@ -176,7 +176,7 @@ firmware_class.path=/vendor/firmware";
 			opp-microvolt = <1068740>;
 		};
 		opp15 {
-			opp-hz = /bits/ 64 <2000000000>;
+			opp-hz = /bits/ 64 <1800000000>;
 			opp-microvolt = <1118750>;
 		};
 	};
@@ -267,7 +267,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x000>;
 			enable-method = "psci";
-			clock-frequency = <2600000000>;
+			clock-frequency = <2301000000>;
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <275>;
 			capacity-dmips-mhz = <1024>;
@@ -280,7 +280,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x001>;
 			enable-method = "psci";
-			clock-frequency = <2600000000>;
+			clock-frequency = <2301000000>;
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <275>;
 			capacity-dmips-mhz = <1024>;
@@ -293,7 +293,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x002>;
 			enable-method = "psci";
-			clock-frequency = <2600000000>;
+			clock-frequency = <2301000000>;
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <275>;
 			capacity-dmips-mhz = <1024>;
@@ -306,7 +306,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x003>;
 			enable-method = "psci";
-			clock-frequency = <2600000000>;
+			clock-frequency = <2301000000>;
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <275>;
 			capacity-dmips-mhz = <1024>;
@@ -319,7 +319,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x100>;
 			enable-method = "psci";
-			clock-frequency = <2000000000>;
+			clock-frequency = <1800000000>;
 			operating-points-v2 = <&cluster1_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <801>;
@@ -332,7 +332,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x101>;
 			enable-method = "psci";
-			clock-frequency = <2000000000>;
+			clock-frequency = <1800000000>;
 			operating-points-v2 = <&cluster1_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <801>;
@@ -345,7 +345,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x102>;
 			enable-method = "psci";
-			clock-frequency = <2000000000>;
+			clock-frequency = <1800000000>;
 			operating-points-v2 = <&cluster1_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <801>;
@@ -358,7 +358,7 @@ firmware_class.path=/vendor/firmware";
 			compatible = "arm,cortex-a53";
 			reg = <0x103>;
 			enable-method = "psci";
-			clock-frequency = <2000000000>;
+			clock-frequency = <1800000000>;
 			operating-points-v2 = <&cluster1_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <801>;
@@ -539,23 +539,6 @@ firmware_class.path=/vendor/firmware";
 			alloc-ranges = <0 0xc0000000 0 0x10000000>;
 		};
 
-#if defined(CONFIG_MICROTRUST_TEE_SUPPORT) || \
-	defined(CONFIG_MICROTRUST_TEE_LITE_SUPPORT)
-		soter-shared-mem {
-			compatible = "microtrust,shared_mem";
-			no-map;
-#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) || \
-	defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
-			size = <0 0x800000>;
-			alignment = <0 0x1000000>;
-#else
-			size = <0 0x200000>;
-			alignment = <0 0x200000>;
-#endif
-			alloc-ranges = <0 0x40000000 0 0x50000000>;
-		};
-#endif
-
 	};
 
 	cpu_dbgapb: cpu_dbgapb@0d410000 {
@@ -664,17 +647,10 @@ firmware_class.path=/vendor/firmware";
 		#clock-cells = <1>;
 	};
 
-#if defined(CONFIG_MICROTRUST_TEE_LITE_SUPPORT)
-	mcdi@0010fc00 {
+	mcdi@00110100 {
 		compatible = "mediatek,mt6765-mcdi";
-		reg = <0 0x0010fc00 0 0x800>;
+		reg = <0 0x00110100 0 0x800>;
 	};
-#else
-        mcdi@00110100 {
-                compatible = "mediatek,mt6765-mcdi";
-                reg = <0 0x00110100 0 0x800>;
-        };
-#endif
 
 	scpsys: scpsys@10001000 {
 		compatible = "mediatek,mt6765-scpsys", "syscon";
@@ -1049,25 +1025,17 @@ firmware_class.path=/vendor/firmware";
 	};
 
 	touch: touch {
-		compatible = "mediatek,touch","goodix,touch";
+		compatible = "goodix,touch";
 	};
 
 	accdet: accdet {
 		compatible = "mediatek,pmic-accdet";
 	};
 
-	/*ICN fingerprint*/
-	icnfpsensor:icnfpsensor@0 {
-		compatible = "mediatek,icnfpsensor";
-	};
 	goodix_fp: fingerprint {
 		compatible = "mediatek,goodix-fp";
 	};
-	/*add by focaltech start*/
-	focaltech_fp: focaltech_fp {
-        compatible = "focaltech,focaltech_fp";
-	};
-	/*add by focaltech end*/
+
 	topmisc@10011000 {
 		compatible = "mediatek,topmisc";
 		reg = <0 0x10011000 0 0x1000>;
@@ -1107,17 +1075,10 @@ firmware_class.path=/vendor/firmware";
 			compatible = "mediatek,mt6765-dvfsrc-met";
 		};
 
-#if defined(CONFIG_MICROTRUST_TEE_LITE_SUPPORT)
-		qos@00110780 {
+		qos@00110b80 {
 			compatible = "mediatek,mt6765-qos";
-			reg = <0 0x00110780 0 0x80>;
+			reg = <0 0x00110b80 0 0x80>;
 		};
-#else
-                qos@00110b80 {
-                        compatible = "mediatek,mt6765-qos";
-                        reg = <0 0x00110b80 0 0x80>;
-                };
-#endif
 	};
 
 	mbist_ao@10013000 {
@@ -1485,17 +1446,10 @@ firmware_class.path=/vendor/firmware";
 		reg = <0 0x10227000 0 0x1000>;
 	};
 
-#if defined(CONFIG_MICROTRUST_TEE_LITE_SUPPORT)
-	dvfsp@00110800 {
+	dvfsp@00110c00 {
 		compatible = "mediatek,mt6765-dvfsp";
-		reg = <0 0x00110800 0 0x1400>,
-		      <0 0x00110800 0 0x1400>;
-#else
-        dvfsp@00110c00 {
-                compatible = "mediatek,mt6765-dvfsp";
-                reg = <0 0x00110c00 0 0x1400>,
-                      <0 0x00110c00 0 0x1400>;
-#endif
+		reg = <0 0x00110c00 0 0x1400>,
+		      <0 0x00110c00 0 0x1400>;
 		state = <1>;
 		change_flag = <0>;
 		little-rise-time = <1000>;
@@ -2356,6 +2310,12 @@ firmware_class.path=/vendor/firmware";
 		io-channel-names = "thermistor-ch2";
 		interconnects = <&auxadc 2>;
 	};
+	tboard_thermistor4: thermal-sensor4 {
+		compatible = "mediatek,mtboard-thermistor4";
+		io-channels = <&auxadc 3>;
+		io-channel-names = "thermistor-ch3";
+		interconnects = <&auxadc 3>;
+	};
 
 	btif@1100c000 {
 		compatible = "mediatek,btif";
@@ -2515,12 +2475,30 @@ firmware_class.path=/vendor/firmware";
 		clock-names = "usb0",
 			"usb0_clk_top_sel",
 			"usb0_clk_univpll3_d4";
-			charger = <&mtk_charger_type>;
+		pericfg= <&pericfg>;
+		interrupt-names = "mc";
+		phys = <&u2port0 PHY_TYPE_USB2>;
+		dr_mode = "otg";
+		usb-role-switch;
 	};
 
-	usb_sif@11210000 {
-		compatible = "mediatek,usb_sif";
-		reg = <0 0x11210000 0 0x10000>;
+	u2phy0: usb-phy@11210000 {
+		compatible = "mediatek,generic-tphy-v1";
+		reg = <0 0x11cc0000 0 0x0800>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		status = "okay";
+		u2port0: usb-phy@11210000 {
+			reg = <0 0x11cc0800 0 0x100>;
+			clocks = <&clk26m>;
+			clock-names = "ref";
+			#phy-cells = <1>;
+			nvmem-cells = <&u2_phy_data>;
+			nvmem-cell-names = "intr_cal";
+			nvmem-cell-masks = <0x1f>;
+			status = "okay";
+		};
 	};
 
 	msdc0:msdc@11230000 {
@@ -2780,11 +2758,6 @@ firmware_class.path=/vendor/firmware";
 		compatible = "mediatek,irq_nfc-eint";
 	};
 
-	mtee_svp: mtee_svp {
-		compatible = "medaitek,svp";
-	};
-	/* svp end */
-
 	disp_mutex0: disp_mutex0@14001000 {
 		compatible = "mediatek,disp_mutex0";
 		reg = <0 0x14001000 0 0x1000>;
@@ -3013,12 +2986,7 @@ firmware_class.path=/vendor/firmware";
 		reg = <0 0x14015000 0 0x1000>;
 		interrupts = <GIC_SPI 276 IRQ_TYPE_LEVEL_LOW>;
 	};
-	flashlights_constant_gpio: flashlights_constant_gpio {
-		compatible = "mediatek,flashlights_constant_gpio";
-	};
-	lcd_id_node: lcd_id {
-		compatible = "mediatek,lcd_id_gpio";
-	};
+
 	mtkfb: mtkfb@0 {
 		compatible = "mediatek,mtkfb";
 	};
@@ -3361,7 +3329,7 @@ firmware_class.path=/vendor/firmware";
 
 	flashlights_mt6370: flashlights_mt6370 {
 		compatible = "mediatek,flashlights_mt6370";
-		decouple = <1>;
+		decouple = <0>;
 		channel@1 {
 			type = <0>;
 			ct = <0>;
@@ -3391,25 +3359,30 @@ firmware_class.path=/vendor/firmware";
 	lk_charger: lk_charger {
 		compatible = "mediatek,lk_charger";
 		enable_anime;
-		enable_pe_plus;
 		enable_pd20_reset;
 		power_path_support;
 		max_charger_voltage = <6500000>;
 		fast_charge_voltage = <3000000>;
 
 		/* charging current */
+		default_charger_current = <240000>;
+		sw_jeita_ac_charger_current = <1000000>;
+		sw_jeita_ac_charger_input_current = <1000000>;
 		usb_charger_current = <500000>;
 		ac_charger_current = <2000000>;
 		ac_charger_input_current = <2000000>;
-		non_std_ac_charger_current = <2000000>;
-		charging_host_charger_current = <2000000>;
+		non_std_ac_charger_current = <500000>;
+		charging_host_charger_current = <1500000>;
 		ta_ac_charger_current = <3000000>;
-		pd_charger_current = <2000000>;
+		pd_charger_current = <500000>;
 
 		/* battery temperature protection */
 		temp_t4_threshold = <50>;
 		temp_t3_threshold = <45>;
+		temp_t2_threshold = <15>;
 		temp_t1_threshold = <0>;
+
+		led_brightness = <128>;
 	};
 
 	pe: pe {
@@ -3428,13 +3401,12 @@ firmware_class.path=/vendor/firmware";
 		ta_ac_9v_input_current = <3200000>;
 		ta_ac_7v_input_current = <3200000>;
 		pe_charger_current = <3000000>;
-		status = "disabled";
 	};
 
 	pe2: pe2 {
 		compatible = "mediatek,charger,pe2";
 		gauge = <&mtk_gauge>;
-		status = "disabled";
+
 		/* PE 2.0 */
 		pe20_ichg_level_threshold = <1000000>; /* uA */
 		ta_start_battery_soc = <0>;
@@ -3468,7 +3440,7 @@ firmware_class.path=/vendor/firmware";
 		vsys_watt = <5000000>;
 		ibus_err = <14>;
 
-		pd_stop_battery_soc = <80>;
+		pd_stop_battery_soc = <95>;
 
 		/* single charger */
 		sc_input_current = <3200000>;
@@ -3487,7 +3459,7 @@ firmware_class.path=/vendor/firmware";
 	pe4: pe4 {
 		compatible = "mediatek,charger,pe4";
 		gauge = <&mtk_gauge>;
-		status = "disabled";
+
 		min_charger_voltage = <4600000>;
 		pe40_stop_battery_soc = <80>;
 
@@ -3518,7 +3490,7 @@ firmware_class.path=/vendor/firmware";
 	charger: charger {
 		compatible = "mediatek,charger";
 		gauge = <&mtk_gauge>;
-		charger = <&mtk_charger_type>;
+		charger = <&mt6370_chg>;
 		bootmode = <&chosen>;
 		pmic = <&main_pmic>;
 
@@ -3526,26 +3498,27 @@ firmware_class.path=/vendor/firmware";
 		charger_configuration= <0>;
 
 		/* common */
-		battery_cv = <4400000>;
+		battery_cv = <4432000>;
 		max_charger_voltage = <6500000>;
-		min_charger_voltage = <4400000>;
+		min_charger_voltage = <4600000>;
 
 		/* sw jeita */
 		/* enable_sw_jeita; */
-		jeita_temp_above_t4_cv = <4240000>;
-		jeita_temp_t3_to_t4_cv = <4240000>;
-		jeita_temp_t2_to_t3_cv = <4340000>;
-		jeita_temp_t1_to_t2_cv = <4240000>;
-		jeita_temp_t0_to_t1_cv = <4040000>;
-		jeita_temp_below_t0_cv = <4040000>;
+		enable_sw_jeita;
+		jeita_temp_above_t4_cv = <4208000>;
+		jeita_temp_t3_to_t4_cv = <4208000>;
+		jeita_temp_t2_to_t3_cv = <4432000>;
+		jeita_temp_t1_to_t2_cv = <4432000>;
+		jeita_temp_t0_to_t1_cv = <4432000>;
+		jeita_temp_below_t0_cv = <4208000>;
 		temp_t4_thres = <50>;
 		temp_t4_thres_minus_x_degree = <47>;
 		temp_t3_thres = <45>;
 		temp_t3_thres_minus_x_degree = <39>;
-		temp_t2_thres = <10>;
-		temp_t2_thres_plus_x_degree = <16>;
+		temp_t2_thres = <15>;
+		temp_t2_thres_plus_x_degree = <18>;
 		temp_t1_thres = <0>;
-		temp_t1_thres_plus_x_degree = <6>;
+		temp_t1_thres_plus_x_degree = <0>;
 		temp_t0_thres = <0>;
 		temp_t0_thres_plus_x_degree = <0>;
 		temp_neg_10_thres = <0>;
@@ -3554,14 +3527,14 @@ firmware_class.path=/vendor/firmware";
 		enable_min_charge_temp;
 		min_charge_temp = <0>;
 		min_charge_temp_plus_x_degree = <6>;
-		max_charge_temp = <55>;
-		max_charge_temp_minus_x_degree = <50>;
+		max_charge_temp = <50>;
+		max_charge_temp_minus_x_degree = <47>;
 
 		/* charging current */
 		usb_charger_current = <500000>;
 		ac_charger_current = <2000000>;
-		ac_charger_input_current = <2000000>;
-		charging_host_charger_current = <2000000>;
+		ac_charger_input_current = <1500000>;
+		charging_host_charger_current = <1500000>;
 
 		/* dynamic mivr */
 		enable_dynamic_mivr;
@@ -3573,6 +3546,16 @@ firmware_class.path=/vendor/firmware";
 	pd_adapter: pd_adapter {
 		compatible = "mediatek,pd_adapter";
 		adapter_name = "pd_adapter";
+	};
+
+	extcon_usb: extcon_usb {
+		compatible = "mediatek,extcon-usb";
+		charger = <&mt6370_chg>;
+		vbus-supply = <&otg_vbus>;
+		vbus-voltage = <5000000>;
+		vbus-current = <1800000>;
+		dev-conn = <&usb>;
+		/* mediatek,bypss-typec-sink = <1>; */
 	};
 
 	rt9465_slave_chr: rt9465_slave_chr {
@@ -3588,6 +3571,12 @@ firmware_class.path=/vendor/firmware";
 	};
 
 	tcpc_pd: mt6370_pd_eint {
+	};
+
+	bat_gm30: battery {
+		compatible = "mediatek,bat_gm30";
+		io-channels = <&auxadc 4>;
+		io-channel-names = "batteryID-channel";
 	};
 
 	irtx_pwm:irtx_pwm {
