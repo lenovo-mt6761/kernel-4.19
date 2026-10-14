@@ -28,7 +28,6 @@
 #include "mtk_rect.h"
 #include "mtk_drm_drv.h"
 #include "mtk_drm_graphics_base.h"
-#include "mtk_drm_mmp.h"
 
 static struct layering_rule_ops l_rule_ops;
 static struct layering_rule_info_t l_rule_info;
@@ -544,12 +543,10 @@ static int layering_get_valid_hrt(struct drm_crtc *crtc,
 
 	dvfs_bw *= 10000;
 
-	DDP_MUTEX_LOCK(&mtk_crtc->state_lock, __func__, __LINE__);
 	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
 	if (output_comp)
 		mtk_ddp_comp_io_cmd(output_comp, NULL,
 			GET_FRAME_HRT_BW_BY_DATARATE, &tmp);
-	DDP_MUTEX_UNLOCK(&mtk_crtc->state_lock, __func__, __LINE__);
 	if (!tmp) {
 		DDPPR_ERR("Get frame hrt bw by datarate is zero\n");
 		return 600;

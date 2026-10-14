@@ -434,9 +434,6 @@ static int vcodec_vcu_send_msg(struct vdec_vcu_inst *vcu, void *msg, int len)
 	if (vcu->abort)
 		return -EIO;
 
-	if (vcu->ctx != NULL && vcu->ctx->dev->is_codec_suspending == 1)
-		mtk_vcodec_err(vcu, "VDEC blocked by suspend\n");
-
 	vcu_get_file_lock();
 	vcu_get_task(&task, &f, 0);
 	if (task == NULL ||

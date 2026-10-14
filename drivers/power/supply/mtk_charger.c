@@ -59,9 +59,13 @@
 
 #include "mtk_charger.h"
 
+int factory_charger_disable = 0;
+extern int bat_maintenance;
+extern int g_bm_month;
+static bool is_ntc_limit = false;
 static bool is_module_init_done;
-extern int  mtk_battery_external_power_changed_ovp(void); //zxs
-extern int  mtk_battery_external_power_changed_recover(void);
+extern void do_charger_detect(bool en);
+
 struct tag_bootmode {
 	u32 size;
 	u32 tag;
@@ -78,12 +82,12 @@ int chr_get_debug_level(void)
 	if (info == NULL) {
 		psy = power_supply_get_by_name("mtk-master-charger");
 		if (psy == NULL)
-			ret = CHRLOG_DEBUG_LEVEL;
+			ret = CHRLOG_ERROR_LEVEL;
 		else {
 			info =
 			(struct mtk_charger *)power_supply_get_drvdata(psy);
 			if (info == NULL)
-				ret = CHRLOG_DEBUG_LEVEL;
+				ret = CHRLOG_ERROR_LEVEL;
 			else
 				ret = info->log_level;
 		}
@@ -471,7 +475,7 @@ static void mtk_charger_start_timer(struct mtk_charger *info)
 
 	get_monotonic_boottime(&time_now);
 	time.tv_sec = info->polling_interval;
-	time.tv_nsec = 0;
+	time.tv_nsec = info->usb_ntc_polling_interval;
 	info->endtime = timespec_add(time_now, time);
 	ktime = ktime_set(info->endtime.tv_sec, info->endtime.tv_nsec);
 
@@ -556,107 +560,32 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 
 	/* JEITA battery temp Standard */
 	if (info->battery_temp >= info->data.temp_t4_thres) {
-		chr_err("[SW_JEITA] Battery Over high Temperature(%d) !!\n",
-			info->data.temp_t4_thres);
-
-		sw_jeita->sm = TEMP_ABOVE_T4;
+		chr_err("[SW_JEITA] tbat >= %d, stop charging!\n", info->data.temp_t4_thres);
+		sw_jeita->cv = info->data.jeita_temp_above_t4_cv;
+		info->sw_jeita.sm = TEMP_ABOVE_T4;
 		sw_jeita->charging = false;
 	} else if (info->battery_temp > info->data.temp_t3_thres) {
-		/* control 45 degree to normal behavior */
-		if ((sw_jeita->sm == TEMP_ABOVE_T4)
-		    && (info->battery_temp
-			>= info->data.temp_t4_thres_minus_x_degree)) {
-			chr_err("[SW_JEITA] Battery Temperature between %d and %d,not allow charging yet!!\n",
-				info->data.temp_t4_thres_minus_x_degree,
-				info->data.temp_t4_thres);
+		chr_err("[SW_JEITA] %d < tbat < %d\n", info->data.temp_t3_thres, info->data.temp_t4_thres);
+		sw_jeita->cv = info->data.jeita_temp_t3_to_t4_cv;
+		info->sw_jeita.sm = TEMP_T3_TO_T4;
 
+		if (get_battery_voltage(info) > 4200) {
+			chr_err("[SW_JEITA] vbat > 4.2V, stop charging!\n");
 			sw_jeita->charging = false;
-		} else {
-			chr_err("[SW_JEITA] Battery Temperature between %d and %d !!\n",
-				info->data.temp_t3_thres,
-				info->data.temp_t4_thres);
-
-			sw_jeita->sm = TEMP_T3_TO_T4;
 		}
 	} else if (info->battery_temp >= info->data.temp_t2_thres) {
-		if (((sw_jeita->sm == TEMP_T3_TO_T4)
-		     && (info->battery_temp
-			 >= info->data.temp_t3_thres_minus_x_degree))
-		    || ((sw_jeita->sm == TEMP_T1_TO_T2)
-			&& (info->battery_temp
-			    <= info->data.temp_t2_thres_plus_x_degree))) {
-			chr_err("[SW_JEITA] Battery Temperature not recovery to normal temperature charging mode yet!!\n");
-		} else {
-			chr_err("[SW_JEITA] Battery Normal Temperature between %d and %d !!\n",
-				info->data.temp_t2_thres,
-				info->data.temp_t3_thres);
-			sw_jeita->sm = TEMP_T2_TO_T3;
-		}
-	} else if (info->battery_temp >= info->data.temp_t1_thres) {
-		if ((sw_jeita->sm == TEMP_T0_TO_T1
-		     || sw_jeita->sm == TEMP_BELOW_T0)
-		    && (info->battery_temp
-			<= info->data.temp_t1_thres_plus_x_degree)) {
-			if (sw_jeita->sm == TEMP_T0_TO_T1) {
-				chr_err("[SW_JEITA] Battery Temperature between %d and %d !!\n",
-					info->data.temp_t1_thres_plus_x_degree,
-					info->data.temp_t2_thres);
-			}
-			if (sw_jeita->sm == TEMP_BELOW_T0) {
-				chr_err("[SW_JEITA] Battery Temperature between %d and %d,not allow charging yet!!\n",
-					info->data.temp_t1_thres,
-					info->data.temp_t1_thres_plus_x_degree);
-				sw_jeita->charging = false;
-			}
-		} else {
-			chr_err("[SW_JEITA] Battery Temperature between %d and %d !!\n",
-				info->data.temp_t1_thres,
-				info->data.temp_t2_thres);
-
-			sw_jeita->sm = TEMP_T1_TO_T2;
-		}
-	} else if (info->battery_temp >= info->data.temp_t0_thres) {
-		if ((sw_jeita->sm == TEMP_BELOW_T0)
-		    && (info->battery_temp
-			<= info->data.temp_t0_thres_plus_x_degree)) {
-			chr_err("[SW_JEITA] Battery Temperature between %d and %d,not allow charging yet!!\n",
-				info->data.temp_t0_thres,
-				info->data.temp_t0_thres_plus_x_degree);
-
-			sw_jeita->charging = false;
-		} else {
-			chr_err("[SW_JEITA] Battery Temperature between %d and %d !!\n",
-				info->data.temp_t0_thres,
-				info->data.temp_t1_thres);
-
-			sw_jeita->sm = TEMP_T0_TO_T1;
-		}
-	} else {
-		chr_err("[SW_JEITA] Battery below low Temperature(%d) !!\n",
-			info->data.temp_t0_thres);
-		sw_jeita->sm = TEMP_BELOW_T0;
-		sw_jeita->charging = false;
-	}
-
-	/* set CV after temperature changed */
-	/* In normal range, we adjust CV dynamically */
-	if (sw_jeita->sm != TEMP_T2_TO_T3) {
-		if (sw_jeita->sm == TEMP_ABOVE_T4)
-			sw_jeita->cv = info->data.jeita_temp_above_t4_cv;
-		else if (sw_jeita->sm == TEMP_T3_TO_T4)
-			sw_jeita->cv = info->data.jeita_temp_t3_to_t4_cv;
-		else if (sw_jeita->sm == TEMP_T2_TO_T3)
-			sw_jeita->cv = 0;
-		else if (sw_jeita->sm == TEMP_T1_TO_T2)
-			sw_jeita->cv = info->data.jeita_temp_t1_to_t2_cv;
-		else if (sw_jeita->sm == TEMP_T0_TO_T1)
-			sw_jeita->cv = info->data.jeita_temp_t0_to_t1_cv;
-		else if (sw_jeita->sm == TEMP_BELOW_T0)
-			sw_jeita->cv = info->data.jeita_temp_below_t0_cv;
-		else
-			sw_jeita->cv = info->data.battery_cv;
-	} else {
+		chr_err("[SW_JEITA] %d <= tbat <= %d\n", info->data.temp_t2_thres, info->data.temp_t3_thres);
 		sw_jeita->cv = 0;
+		info->sw_jeita.sm = TEMP_T2_TO_T3;
+	} else if (info->battery_temp > info->data.temp_t1_thres) {
+		chr_err("[SW_JEITA] %d < tbat < %d\n", info->data.temp_t1_thres, info->data.temp_t2_thres);
+		sw_jeita->cv = info->data.jeita_temp_t1_to_t2_cv;
+		info->sw_jeita.sm = TEMP_T1_TO_T2;
+	} else {
+		chr_err("[SW_JEITA] tbat <= %d, stop charging!\n", info->data.temp_t1_thres);
+		sw_jeita->cv = info->data.jeita_temp_below_t0_cv;
+		info->sw_jeita.sm = TEMP_BELOW_T0;
+		sw_jeita->charging = false;
 	}
 
 	chr_err("[SW_JEITA]preState:%d newState:%d tmp:%d cv:%d\n",
@@ -766,6 +695,10 @@ static ssize_t ADC_Charger_Voltage_show(struct device *dev,
 {
 	struct mtk_charger *pinfo = dev->driver_data;
 	int vbus = get_vbus(pinfo); /* mV */
+	if (!atomic_read(&pinfo->enable_kpoc_shdn) || vbus < 0) {
+		chr_err("HardReset or get vbus failed, vbus:%d:5000\n", vbus);
+		vbus = 5000;
+	}
 
 	chr_err("%s: %d\n", __func__, vbus);
 	return sprintf(buf, "%d\n", vbus);
@@ -850,12 +783,55 @@ static ssize_t charger_log_level_store(struct device *dev,
 
 static DEVICE_ATTR_RW(charger_log_level);
 
+static int get_float_charger_status(struct mtk_charger *info)
+{
+	struct power_supply *psy = NULL;
+	union power_supply_propval prop_type = {0};
+	int notify_code = 0;
+	int rp;
+
+	rp = adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL);
+	if ((info->pd_type == MTK_PD_CONNECT_PE_READY_SNK ||
+				info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
+				info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO) &&
+			rp != 500) {
+		chr_err("%s, is typec adapter\n", __func__);
+		return notify_code;
+	}
+
+	psy = power_supply_get_by_name("mtk_charger_type");
+	if (psy == NULL) {
+		chr_err("%s get mtk_charger_type fail\n", __func__);
+	} else {
+		power_supply_get_property(psy, POWER_SUPPLY_PROP_TYPE, &prop_type);
+		chr_err("%s get prop type:%d\n", __func__, prop_type.intval);
+		if (prop_type.intval == POWER_SUPPLY_TYPE_USB_FLOAT) {
+			notify_code = 0x80;
+			chr_err("%s new notify_code:0x%x\n", __func__, notify_code);
+		}
+	}
+
+	return notify_code;
+}
+
 static ssize_t BatteryNotify_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct mtk_charger *pinfo = dev->driver_data;
+	int float_code = 0;
 
-	chr_info("%s: 0x%x\n", __func__, pinfo->notify_code);
+	pinfo->notify_code &= ~0xa2;
+
+	float_code = get_float_charger_status(pinfo);
+	pinfo->notify_code |= float_code;
+
+	if (pinfo->battery_temp >= pinfo->data.temp_t4_thres)
+		pinfo->notify_code |= 0x2;
+
+	if (pinfo->battery_temp <= pinfo->data.temp_t1_thres)
+		pinfo->notify_code |= 0x20;
+
+	chr_err("%s: 0x%x\n", __func__, pinfo->notify_code);
 
 	return sprintf(buf, "%u\n", pinfo->notify_code);
 }
@@ -1102,8 +1078,7 @@ int mtk_chg_enable_vbus_ovp(bool enable)
 			    __func__, enable, sw_ovp);
 	return ret;
 }
-int is_ovp_state = 0;
-EXPORT_SYMBOL(is_ovp_state);
+
 /* return false if vbus is over max_charger_voltage */
 static bool mtk_chg_check_vbus(struct mtk_charger *info)
 {
@@ -1113,10 +1088,8 @@ static bool mtk_chg_check_vbus(struct mtk_charger *info)
 	if (vchr > info->data.max_charger_voltage) {
 		chr_err("%s: vbus(%d mV) > %d mV\n", __func__, vchr / 1000,
 			info->data.max_charger_voltage / 1000);
-		is_ovp_state = 1;
 		return false;
 	}
-	is_ovp_state = 0;
 	return true;
 }
 
@@ -1126,20 +1099,13 @@ static void mtk_battery_notify_VCharger_check(struct mtk_charger *info)
 	int vchr = 0;
 
 	vchr = get_vbus(info) * 1000; /* uV */
-	if (vchr < info->data.max_charger_voltage){
+	if (vchr < info->data.max_charger_voltage)
 		info->notify_code &= ~CHG_VBUS_OV_STATUS;
-		chr_err("%s: L%d vbus(%d mV) < %d mV\n", __func__,__LINE__, vchr / 1000,
-			info->data.max_charger_voltage / 1000);
-
-    //   mtk_battery_external_power_changed_recover();
-	}
 	else {
 		info->notify_code |= CHG_VBUS_OV_STATUS;
-		chr_err("[BATTERY] %s:L%d charger_vol(%d mV) > %d mV\n",__func__,__LINE__, 
+		chr_err("[BATTERY] charger_vol(%d mV) > %d mV\n",
 			vchr / 1000, info->data.max_charger_voltage / 1000);
 		mtk_chgstat_notify(info);
-
-		// mtk_battery_external_power_changed_ovp(); //zxs
 	}
 #endif
 }
@@ -1259,12 +1225,14 @@ static void mtk_chg_get_tchg(struct mtk_charger *info)
 	}
 }
 
-unsigned int yk_stop_percent = 100;
 static void charger_check_status(struct mtk_charger *info)
 {
 	bool charging = true;
 	int temperature;
 	struct battery_thermal_protection_data *thermal;
+	struct power_supply *bat_psy;
+	union power_supply_propval propval;
+	int capacity, current_now, voltage_now;
 
 	if (get_charger_type(info) == POWER_SUPPLY_TYPE_UNKNOWN)
 		return;
@@ -1302,7 +1270,6 @@ static void charger_check_status(struct mtk_charger *info)
 			}
 		}
 
-
 		if (temperature >= thermal->max_charge_temp) {
 			chr_err("Battery over Temperature or NTC fail %d %d\n",
 				temperature, thermal->max_charge_temp);
@@ -1331,41 +1298,53 @@ static void charger_check_status(struct mtk_charger *info)
 		goto stop_charging;
 	}
 
+	bat_psy = power_supply_get_by_name("battery");
+	if (!bat_psy) {
+		chr_err("bat psy is NULL\n");
+	} else {
+		power_supply_get_property(bat_psy,
+				POWER_SUPPLY_PROP_MAINTENANCE_CAPACITY, &propval);
+		capacity = propval.intval;
+		power_supply_get_property(bat_psy,
+				POWER_SUPPLY_PROP_VOLTAGE_NOW, &propval);
+		voltage_now = propval.intval;
+		power_supply_get_property(bat_psy,
+				POWER_SUPPLY_PROP_CURRENT_NOW, &propval);
+		current_now = propval.intval;
+		chr_err("maintenance capacity is %d\n", capacity);
+	}
+
 	if (info->cmd_discharging)
 		charging = false;
 	if (info->safety_timeout)
 		charging = false;
 	if (info->vbusov_stat)
 		charging = false;
-
-	//充电限制功能
-	if((get_uisoc(info) >= yk_stop_percent) && (yk_stop_percent < 100))//todo 100% not stop
-	{
-		printk("trx eta6937,battery_get_uisoc >= %d\n",yk_stop_percent);
+	if (info->usb_ntc_limit_charging)
 		charging = false;
-		goto stop_charging;
-	}
 
 stop_charging:
 	mtk_battery_notify_check(info);
 
-//info->thermal.max_charge_temp   	info->thermal.min_charge_temp
-    if(temperature  >= info->thermal.max_charge_temp ||temperature <= info->thermal.min_charge_temp ||is_ovp_state){
-		mtk_battery_external_power_changed_ovp();
-		chr_err("temp over limit,min_charge_temp=%d,max_charge_temp=%d\n",info->thermal.min_charge_temp,info->thermal.max_charge_temp);
-	   }else{
-		  if(thermal->sm == BAT_TEMP_NORMAL)
-		   mtk_battery_external_power_changed_recover();
-	   }
-	chr_err("tmp:%d (jeita:%d sm:%d cv:%d en:%d) (sm:%d) en:%d c:%d s:%d ov:%d %d %d\n",
+	chr_err("tmp:%d (jeita:%d sm:%d cv:%d en:%d) (sm:%d) en:%d c:%d s:%d ov:%d %d %d cur:%d vol:%d soc:%d\n",
 		temperature, info->enable_sw_jeita, info->sw_jeita.sm,
 		info->sw_jeita.cv, info->sw_jeita.charging, thermal->sm,
 		charging, info->cmd_discharging, info->safety_timeout,
-		info->vbusov_stat, info->can_charging, charging);
+		info->vbusov_stat, info->can_charging, charging,
+		current_now, voltage_now, capacity);
 
 	if (charging != info->can_charging)
 		_mtk_enable_charging(info, charging);
-
+	if (info->usb_ntc_limit_charging) {
+		if (info->algo.enable_hz != NULL)
+			info->algo.enable_hz(info, !charging);
+		is_ntc_limit = true;
+	}
+	if ((!info->usb_ntc_limit_charging)&&is_ntc_limit)
+	{
+		info->algo.enable_hz(info, false);
+		is_ntc_limit = false;
+	}
 	info->can_charging = charging;
 }
 
@@ -1484,7 +1463,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	return 0;
 }
 
-extern void set_gpio_charge_en(int enable);
 static int mtk_charger_plug_in(struct mtk_charger *info,
 				int chr_type)
 {
@@ -1514,7 +1492,6 @@ static int mtk_charger_plug_in(struct mtk_charger *info,
 
 	charger_dev_plug_in(info->chg1_dev);
 
-     set_gpio_charge_en(0);
 	return 0;
 }
 
@@ -1560,10 +1537,13 @@ static void kpoc_power_off_check(struct mtk_charger *info)
 	/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
 	/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
 	if (boot_mode == 8 || boot_mode == 9) {
-		vbus = get_vbus(info);
-		if (vbus >= 0 && vbus < 2500 && !mtk_is_charger_on(info) && !info->pd_reset) {
-			chr_err("Unplug Charger/USB in KPOC mode, vbus=%d, shutdown\n", vbus);
-			kernel_power_off();
+		if (atomic_read(&info->enable_kpoc_shdn)) {
+			vbus = get_vbus(info);
+			if (vbus >= 0 && vbus < 2500 && !mtk_is_charger_on(info)) {
+				chr_err("Unplug Charger/USB in KPOC mode, vbus=%d, shutdown\n", vbus);
+				msleep(5000);
+				kernel_power_off();
+			}
 		}
 	}
 }
@@ -1585,9 +1565,45 @@ static char *dump_charger_type(int type)
 		return "unknown";
 	}
 }
-int g_battery_temp = 0;
-int g_Vbat = 0;
-int g_uisoc = 0;
+
+extern int mtkts_btsnrpa_get_hw_temp(void);
+static int check_usb_ntc_status(struct mtk_charger *info)
+{
+	int ret = 0;
+	int usb_ntc_temp = 0;
+
+	usb_ntc_temp = mtkts_btsnrpa_get_hw_temp();
+	info->usb_ntc_temp = usb_ntc_temp / 1000;
+	info->battery_temp = get_battery_temperature(info);
+
+	if (info->usb_ntc_temp < USB_NTC_TEMP_INVALID) {
+		chr_err("%s invalid usb ntc temp(%d)\n", __func__, info->usb_ntc_temp);
+		info->polling_interval = CHARGING_INTERVAL;
+		info->usb_ntc_polling_interval = 0;
+	} else if (info->usb_ntc_temp < USB_NTC_TEMP_NORMAL) {
+		info->polling_interval = CHARGING_INTERVAL;
+		info->usb_ntc_polling_interval = 0;
+	} else {
+		info->polling_interval = 0;
+		info->usb_ntc_polling_interval = USB_NTC_INTERVAL;
+	}
+
+	if ((info->usb_ntc_temp - info->battery_temp) > USB_NTC_LIMIT_CHARGING_TEMP) {
+		info->usb_ntc_limit_charging = true;
+		// chr_err("%s usb ntc temp(%d) is too hot than battery temp(%d)\n", __func__,
+		// 		info->usb_ntc_temp, info->battery_temp);
+	} else if ((info->usb_ntc_temp - info->battery_temp) < USB_NTC_SAFETY_TEMP) {
+		info->usb_ntc_limit_charging = false;
+		// chr_err("%s usb ntc temp(%d) and battery temp(%d) at the safety range\n", __func__,
+		// 		info->usb_ntc_temp, info->battery_temp);
+	}
+
+	chr_err("%s usb ntc temp: %d, battery temp: %d, charging status: %s\n", __func__,
+			info->usb_ntc_temp, info->battery_temp, info->usb_ntc_limit_charging ? "false" : "true");
+
+	return ret;
+}
+
 static int charger_routine_thread(void *arg)
 {
 	struct mtk_charger *info = arg;
@@ -1615,8 +1631,6 @@ static int charger_routine_thread(void *arg)
 		info->charger_thread_timeout = false;
 
 		info->battery_temp = get_battery_temperature(info);
-		g_Vbat = get_battery_voltage(info);
-		g_uisoc = get_uisoc(info);
 		chr_err("Vbat=%d vbus:%d ibus:%d I=%d T=%d uisoc:%d type:%s>%s pd:%d\n",
 			get_battery_voltage(info),
 			get_vbus(info),
@@ -1627,12 +1641,13 @@ static int charger_routine_thread(void *arg)
 			dump_charger_type(info->chr_type),
 			dump_charger_type(get_charger_type(info)),
 			info->pd_type);
-		g_battery_temp = info->battery_temp;
+
 		is_charger_on = mtk_is_charger_on(info);
 
 		if (info->charger_thread_polling == true)
 			mtk_charger_start_timer(info);
 
+		check_usb_ntc_status(info);
 		check_battery_exist(info);
 		check_dynamic_mivr(info);
 		charger_check_status(info);
@@ -1727,27 +1742,6 @@ static void mtk_charger_init_timer(struct mtk_charger *info)
 		chr_err("%s: register pm failed\n", __func__);
 #endif /* CONFIG_PM */
 }
-//added by xen for bat current show 20240228
-static int bat_current_show(struct seq_file *m, void *data)
-{
-       struct mtk_charger *pinfo = m->private;
-       seq_printf(m, "%d\n", get_battery_current(pinfo));
-       return 0;
-}
-
-static int bat_current_open(struct inode *node, struct file *file)
-{
-       return single_open(file, bat_current_show, PDE_DATA(node));
-}
-
-static const struct file_operations bat_current_fops = {
-       //.owner = THIS_MODULE,
-       .open = bat_current_open,
-       .read = seq_read,
-       .llseek = seq_lseek,
-       .release = single_release,
-};
-//added by xen for bat current show 20240228
 
 static int mtk_charger_setup_files(struct platform_device *pdev)
 {
@@ -1793,9 +1787,6 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 		chr_err("%s: mkdir /proc/mtk_battery_cmd failed\n", __func__);
 		return -ENOMEM;
 	}
-// added by xen for batt current show 20240228
-    entry = proc_create_data("bat_current", 0644, battery_dir, &bat_current_fops, info);
-// added by xen for batt current show 20240228
 
 	entry = proc_create_data("current_cmd", 0644, battery_dir,
 			&mtk_chg_current_cmd_fops, info);
@@ -1862,6 +1853,8 @@ static int psy_charger_property_is_writeable(struct power_supply *psy,
 		return 1;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		return 1;
+	case POWER_SUPPLY_PROP_FACTORY_CHARGER_DISABLE:
+		return 1;
 	default:
 		return 0;
 	}
@@ -1875,6 +1868,8 @@ static enum power_supply_property charger_psy_properties[] = {
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
+	POWER_SUPPLY_PROP_FACTORY_CHARGER_DISABLE,
+	POWER_SUPPLY_PROP_REAL_TYPE,
 };
 
 static int psy_charger_get_property(struct power_supply *psy,
@@ -1938,6 +1933,12 @@ static int psy_charger_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_BOOT:
 		val->intval = get_charger_zcv(info, chg);
 		break;
+	case POWER_SUPPLY_PROP_FACTORY_CHARGER_DISABLE:
+		val->intval = factory_charger_disable;
+		break;
+	case POWER_SUPPLY_PROP_REAL_TYPE:
+		val->intval = info->pd_type;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -1981,6 +1982,10 @@ int psy_charger_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		info->chg_data[idx].thermal_input_current_limit =
 			val->intval;
+		break;
+	case POWER_SUPPLY_PROP_FACTORY_CHARGER_DISABLE:
+		chr_err("[%s] userspace %s charging \n", __func__, val->intval?"disable":"enable");
+		factory_charger_disable = val->intval;
 		break;
 	default:
 		return -EINVAL;
@@ -2056,6 +2061,7 @@ int notify_adapter_event(struct notifier_block *notifier,
 		pinfo->pd_type = MTK_PD_CONNECT_PE_READY_SNK;
 		mutex_unlock(&pinfo->pd_lock);
 		/* PD is ready */
+		_wake_up_charger(pinfo);
 		break;
 
 	case MTK_PD_CONNECT_PE_READY_SNK_PD30:
@@ -2064,6 +2070,7 @@ int notify_adapter_event(struct notifier_block *notifier,
 		pinfo->pd_type = MTK_PD_CONNECT_PE_READY_SNK_PD30;
 		mutex_unlock(&pinfo->pd_lock);
 		/* PD30 is ready */
+		_wake_up_charger(pinfo);
 		break;
 
 	case MTK_PD_CONNECT_PE_READY_SNK_APDO:
@@ -2091,6 +2098,15 @@ int notify_adapter_event(struct notifier_block *notifier,
 		else
 			pinfo->notify_code &= ~CHG_TYPEC_WD_STATUS;
 		mtk_chgstat_notify(pinfo);
+		break;
+	case MTK_TYPEC_HRESET_STATUS:
+		chr_err("hreset status = %d\n", *(bool *)val);
+		mutex_lock(&pinfo->charger_pd_lock);
+		if (*(bool *)val)
+			atomic_set(&pinfo->enable_kpoc_shdn, 1);
+		else
+			atomic_set(&pinfo->enable_kpoc_shdn, 0);
+		mutex_unlock(&pinfo->charger_pd_lock);
 		break;
 	}
 	return NOTIFY_DONE;
@@ -2124,14 +2140,17 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	mutex_init(&info->cable_out_lock);
 	mutex_init(&info->charger_lock);
 	mutex_init(&info->pd_lock);
+	mutex_init(&info->charger_pd_lock);
 	name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s",
 		"charger suspend wakelock");
 	info->charger_wakelock =
 		wakeup_source_register(NULL, name);
 	spin_lock_init(&info->slock);
+	atomic_set(&info->enable_kpoc_shdn, 1);
 
 	init_waitqueue_head(&info->wait_que);
 	info->polling_interval = CHARGING_INTERVAL;
+	info->usb_ntc_polling_interval = USB_NTC_INTERVAL;
 	mtk_charger_init_timer(info);
 #ifdef CONFIG_PM
 	info->pm_notifier.notifier_call = charger_pm_event;

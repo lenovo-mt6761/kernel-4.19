@@ -35,12 +35,6 @@
 #define COMPAT_TPD_GET_FILTER_PARA _IOWR(TOUCH_IOC_MAGIC, \
 						2, struct tpd_filter_t)
 #endif
-//Start zxs 20150522
-#define PROC_TP_INFO "driver/tp_info"
-#define tp_info_size 128
-char mtk_tp_name[tp_info_size] = {0};
-char mtk_tp_info[tp_info_size] = {0};
-//end
 struct tpd_filter_t tpd_filter;
 struct tpd_dts_info tpd_dts_data;
 struct pinctrl *pinctrl1;
@@ -536,27 +530,6 @@ static void tpd_create_attributes(struct device *dev, struct tpd_attrs *attrs)
 	}
 }
 
-/* Touchpanel information */ //Start zxs 20150522
-static int subsys_tp_info_read(struct seq_file *m, void *v)
-{
-   //PK_ERR("subsys_tp_info_read %s\n",mtk_tp_name);
-//    seq_printf(m, "%s\n",mtk_tp_name);
-   seq_printf(m, "%s\n",mtk_tp_info);
-   return 0;
-};
-
-static int proc_tp_info_open(struct inode *inode, struct file *file)
-{
-    return single_open(file, subsys_tp_info_read, NULL);
-};
-
-static  struct file_operations ftp_proc_fops1 = {
-    .owner = THIS_MODULE,
-    .open  = proc_tp_info_open,
-    .read  = seq_read,
-};
-//end
-
 /* touch panel probe */
 static int tpd_probe(struct platform_device *pdev)
 {
@@ -588,12 +561,6 @@ static int tpd_probe(struct platform_device *pdev)
 	}
 	/* TPD_RES_X = simple_strtoul(LCM_WIDTH, NULL, 0); */
 	/* TPD_RES_Y = simple_strtoul(LCM_HEIGHT, NULL, 0); */
-
-       /* Touchpanel information */
-//Start zxs 20150522
-       memset(mtk_tp_name,0,tp_info_size);
-       proc_create(PROC_TP_INFO, 0, NULL, &ftp_proc_fops1);
-//end
 
 	#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION
 	if (strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "90", 2) == 0
@@ -674,7 +641,6 @@ static int tpd_probe(struct platform_device *pdev)
 			if (tpd_load_status == 1) {
 				TPD_DMESG("%s, tpd_driver_name=%s\n", __func__,
 					  tpd_driver_list[i].tpd_device_name);
-                      snprintf(mtk_tp_name,sizeof(mtk_tp_name),"%s",tpd_driver_list[i].tpd_device_name); //zxs 20150522
 				g_tpd_drv = &tpd_driver_list[i];
 				break;
 			}

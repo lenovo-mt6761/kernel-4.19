@@ -18,31 +18,37 @@
 #define CHRLOG_INFO_LEVEL	2
 #define CHRLOG_DEBUG_LEVEL	3
 
+#define USB_NTC_TEMP_INVALID           0          // 0C
+#define USB_NTC_TEMP_NORMAL            40         // 40C
+#define USB_NTC_INTERVAL               300000000  // 300ms
+#define USB_NTC_LIMIT_CHARGING_TEMP    19         // 19C
+#define USB_NTC_SAFETY_TEMP            8          // 8C
+
 extern int chr_get_debug_level(void);
 
 #define chr_err(fmt, args...)					\
 do {								\
 	if (chr_get_debug_level() >= CHRLOG_ERROR_LEVEL) {	\
-		pr_debug(fmt, ##args);				\
+		pr_notice(fmt, ##args);				\
 	}							\
 } while (0)
 
 #define chr_info(fmt, args...)					\
 do {								\
 	if (chr_get_debug_level() >= CHRLOG_INFO_LEVEL) {	\
-		pr_debug_ratelimited(fmt, ##args);		\
+		pr_notice_ratelimited(fmt, ##args);		\
 	}							\
 } while (0)
 
 #define chr_debug(fmt, args...)					\
 do {								\
 	if (chr_get_debug_level() >= CHRLOG_DEBUG_LEVEL) {	\
-		pr_debug(fmt, ##args);				\
+		pr_notice(fmt, ##args);				\
 	}							\
 } while (0)
 
 struct mtk_charger;
-#define BATTERY_CV 4350000
+#define BATTERY_CV 4430000
 #define V_CHARGER_MAX 6500000 /* 6.5 V */
 #define V_CHARGER_MIN 4600000 /* 4.6 V */
 
@@ -150,6 +156,7 @@ struct mtk_charger_algorithm {
 
 	int (*do_algorithm)(struct mtk_charger *info);
 	int (*enable_charging)(struct mtk_charger *info, bool en);
+	int (*enable_hz)(struct mtk_charger *info, bool en);
 	int (*do_event)(struct notifier_block *nb, unsigned long ev, void *v);
 	int (*change_current_setting)(struct mtk_charger *info);
 	void *algo_data;
@@ -258,6 +265,7 @@ struct mtk_charger {
 	spinlock_t slock;
 	struct wakeup_source *charger_wakelock;
 	struct mutex charger_lock;
+	struct mutex charger_pd_lock;
 
 	/* thread related */
 	wait_queue_head_t  wait_que;
@@ -279,6 +287,9 @@ struct mtk_charger {
 	bool usb_unlimited;
 	bool disable_charger;
 	int battery_temp;
+	int usb_ntc_temp;
+	bool usb_ntc_limit_charging;
+	unsigned int usb_ntc_polling_interval;
 	bool can_charging;
 	bool cmd_discharging;
 	bool safety_timeout;
@@ -286,6 +297,9 @@ struct mtk_charger {
 	bool is_chg_done;
 	/* ATM */
 	bool atm_enabled;
+
+	/* kpoc */
+	atomic_t enable_kpoc_shdn;
 
 	const char *algorithm_name;
 	struct mtk_charger_algorithm algo;

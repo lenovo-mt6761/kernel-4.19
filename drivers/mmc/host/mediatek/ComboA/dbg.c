@@ -26,6 +26,8 @@
 #include <mmc/core/core.h>
 #include <mmc/core/card.h>
 #include <mmc/core/mmc_ops.h>
+#include <mmc/core/queue.h>
+#include <mmc/core/block.h>
 
 #include "dbg.h"
 #include "autok_dvfs.h"
@@ -283,7 +285,6 @@ inline void __dbg_add_host_log(struct mmc_host *mmc, int type,
 		return;
 
 	t = cpu_clock(print_cpu_test);
-	nanosec_rem = do_div(t, 1000000000)/1000;
 #ifdef CONFIG_MTK_EMMC_HW_CQ
 	spin_lock_irqsave(&host->cmd_dump_lock, flags);
 #endif
@@ -291,6 +292,7 @@ inline void __dbg_add_host_log(struct mmc_host *mmc, int type,
 	switch (type) {
 	case 0: /* normal - cmd */
 		tn = t;
+		nanosec_rem = do_div(t, 1000000000)/1000;
 		if (cmd == 44) {
 			tag = (arg >> 16) & 0x1f;
 			dbg_task_log_dat[tag].size = arg & 0xffff;
@@ -316,6 +318,7 @@ inline void __dbg_add_host_log(struct mmc_host *mmc, int type,
 	case 5: /* cqhci - data */
 	case 60: /* cqhci - dcmd */
 	case 61: /* cqhci - dcmd resp */
+		nanosec_rem = do_div(t, 1000000000)/1000;
 		/*skip log if last cmd rsp are the same*/
 		if (last_cmd == cmd &&
 			last_arg == arg && cmd == 13) {
@@ -381,6 +384,7 @@ inline void __dbg_add_host_log(struct mmc_host *mmc, int type,
 	/* add softirq record */
 	case MAGIC_CQHCI_DBG_TYPE_SIRQ:
 		tn = t;
+		nanosec_rem = do_div(t, 1000000000)/1000;
 
 		dbg_run_host_log_dat[dbg_host_cnt].time_sec = t;
 		dbg_run_host_log_dat[dbg_host_cnt].time_usec = nanosec_rem;
@@ -585,6 +589,7 @@ void mmc_cmd_dump(char **buff, unsigned long *size, struct seq_file *m,
 void msdc_dump_host_state(char **buff, unsigned long *size,
 	struct seq_file *m, struct msdc_host *host)
 {
+	void __iomem *base = host->base;
 
 	SPREAD_PRINTF(buff, size, m, "Accumulated dma cnt: %u\n",
 		host->dma_cnt);
@@ -655,14 +660,12 @@ void get_msdc_aee_buffer(unsigned long *vaddr, unsigned long *size)
 		return;
 	}
 
-	if (vaddr == NULL || size == NULL)
-		return;
-
 	buff = msdc_aee_buffer;
 	msdc_dump_host_state(&buff, &free_size, NULL, host);
 	mmc_cmd_dump(&buff, &free_size, NULL, host->mmc, dbg_max_cnt);
 	mmc_low_io_dump(&buff, &free_size, NULL, host->mmc);
 	/* retrun start location */
+	WARN_ON(vaddr == NULL);
 	*vaddr = (unsigned long)msdc_aee_buffer;
 	*size = MSDC_AEE_BUFFER_SIZE - free_size;
 }
@@ -2781,7 +2784,7 @@ static const struct file_operations msdc_help_fops = {
 	.release = single_release,
 };
 
-static int msdc_sdcard_intr_gpio_value_show(struct seq_file *m, void *v)
+int msdc_sdcard_intr_gpio_value_show(struct seq_file *m, void *v)
 {
 	seq_printf(m, "%d\n", gpio_get_value(cd_gpio) ? 0 : 1);
 	return 0;
@@ -2960,6 +2963,44 @@ MSDC_PROC_SHOW(size, "%d\n", ((u32)card->ext_csd.raw_sectors[3]<<24)
 	+ ((u32)card->ext_csd.raw_sectors[2]<<16) +
 ((u32)card->ext_csd.raw_sectors[1]<<8)+((u32)card->ext_csd.raw_sectors[0]));
 
+/**************** /proc/mmcblk0_size START *****************/
+
+static int mmcblk0_size_proc_show(struct seq_file *m, void *v)
+{
+	struct mmc_card *card;
+	struct mmc_blk_data *md;
+
+	card = mtk_msdc_host[0]->mmc->card;
+	md = dev_get_drvdata(&card->dev);
+	if (strcmp(md->disk->disk_name, "mmcblk0") == 0)
+		seq_printf(m, "%d\n", get_capacity(md->disk));
+	else
+		seq_printf(m, "0\n");
+	return 0;
+}
+
+static int mmcblk0_size_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, mmcblk0_size_proc_show, NULL);
+}
+
+static const struct file_operations mmcblk0_size_proc_fops = {
+	.open = mmcblk0_size_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release
+};
+
+static void proc_mmcblk0_size_init(void)
+{
+	struct proc_dir_entry *prEntry;
+
+	prEntry = proc_create("mmcblk0_size", 0, NULL, &mmcblk0_size_proc_fops);
+	if (prEntry == NULL)
+		pr_notice("[%s]: failed to create /proc/mmcblk0_size\n", __func__);
+}
+/**************** /proc/mmcblk0_size END *****************/
+
 #ifdef CONFIG_MTK_MMC_DEBUG
 static const struct file_operations *proc_fops_list[] = {
 	&cid_fops,
@@ -3041,6 +3082,7 @@ int msdc_debug_proc_init(void)
 #ifdef MSDC_DMA_ADDR_DEBUG
 	msdc_init_dma_latest_address();
 #endif
+	proc_mmcblk0_size_init();
 	return 0;
 }
 #else
@@ -3052,6 +3094,7 @@ int msdc_debug_proc_init_bootdevice(void)
 int msdc_debug_proc_init(void)
 {
 	pr_notice("[%s]: CONFIG_MTK_MMC_DEBUG is not set\n", __func__);
+	proc_mmcblk0_size_init();
 	return 0;
 }
 #endif

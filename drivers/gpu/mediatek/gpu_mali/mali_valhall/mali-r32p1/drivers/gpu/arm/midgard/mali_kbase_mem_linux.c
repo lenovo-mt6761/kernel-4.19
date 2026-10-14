@@ -648,8 +648,6 @@ unsigned long kbase_mem_evictable_reclaim_count_objects(struct shrinker *s,
 	struct kbase_context *kctx;
 
 	kctx = container_of(s, struct kbase_context, reclaim);
-	// MTK add to prevent false alarm
-	lockdep_off();
 
 	WARN((sc->gfp_mask & __GFP_ATOMIC),
 	     "Shrinkers cannot be called for GFP_ATOMIC allocations. Check kernel mm for problems. gfp_mask==%x\n",
@@ -658,8 +656,6 @@ unsigned long kbase_mem_evictable_reclaim_count_objects(struct shrinker *s,
 	     "Shrinker called whilst in atomic context. The caller must switch to using GFP_ATOMIC or similar. gfp_mask==%x\n",
 	     sc->gfp_mask);
 
-	// MTK add to prevent false alarm
-	lockdep_on();
 	return atomic_read(&kctx->evict_nents);
 }
 
@@ -692,8 +688,6 @@ unsigned long kbase_mem_evictable_reclaim_scan_objects(struct shrinker *s,
 	unsigned long freed = 0;
 
 	kctx = container_of(s, struct kbase_context, reclaim);
-	// MTK add to prevent false alarm
-	lockdep_off();
 
 	mutex_lock(&kctx->jit_evict_lock);
 
@@ -1618,7 +1612,7 @@ static struct kbase_va_region *kbase_mem_from_user_buffer(
 		struct kbase_context *kctx, unsigned long address,
 		unsigned long size, u64 *va_pages, u64 *flags)
 {
-	long i, dma_mapped_pages;
+	long i;
 	struct kbase_va_region *reg;
 	struct rb_root *rbtree;
 	long faulted_pages;
@@ -1627,8 +1621,6 @@ static struct kbase_va_region *kbase_mem_from_user_buffer(
 	u32 cache_line_alignment = kbase_get_cache_line_alignment(kctx->kbdev);
 	struct kbase_alloc_import_user_buf *user_buf;
 	struct page **pages = NULL;
-	struct tagged_addr *pa;
-	struct device *dev;
 	int write;
 
 	/* Flag supported only for dma-buf imported memory */
@@ -1769,42 +1761,31 @@ KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE
 	reg->gpu_alloc->nents = 0;
 	reg->extension = 0;
 
-	pa = kbase_get_gpu_phy_pages(reg);
-	dev = kctx->kbdev->dev;
-
 	if (pages) {
+		struct device *dev = kctx->kbdev->dev;
+		unsigned long local_size = user_buf->size;
+		unsigned long offset = user_buf->address & ~PAGE_MASK;
+		struct tagged_addr *pa = kbase_get_gpu_phy_pages(reg);
+
 		/* Top bit signifies that this was pinned on import */
 		user_buf->current_mapping_usage_count |= PINNED_ON_IMPORT;
 
-		/* Manual CPU cache synchronization.
-		 *
-		 * The driver disables automatic CPU cache synchronization because the
-		 * memory pages that enclose the imported region may also contain
-		 * sub-regions which are not imported and that are allocated and used
-		 * by the user process. This may be the case of memory at the beginning
-		 * of the first page and at the end of the last page. Automatic CPU cache
-		 * synchronization would force some operations on those memory allocations,
-		 * unbeknown to the user process: in particular, a CPU cache invalidate
-		 * upon unmapping would destroy the content of dirty CPU caches and cause
-		 * the user process to lose CPU writes to the non-imported sub-regions.
-		 *
-		 * When the GPU claims ownership of the imported memory buffer, it shall
-		 * commit CPU writes for the whole of all pages that enclose the imported
-		 * region, otherwise the initial content of memory would be wrong.
-		 */
 		for (i = 0; i < faulted_pages; i++) {
-			dma_addr_t dma_addr =
-				dma_map_page_attrs(dev, pages[i], 0, PAGE_SIZE,
-						   write ? DMA_BIDIRECTIONAL : DMA_TO_DEVICE,
-						   DMA_ATTR_SKIP_CPU_SYNC);
+			dma_addr_t dma_addr;
+			unsigned long min;
 
+			min = MIN(PAGE_SIZE - offset, local_size);
+			dma_addr = dma_map_page(dev, pages[i],
+					offset, min,
+					DMA_BIDIRECTIONAL);
 			if (dma_mapping_error(dev, dma_addr))
 				goto unwind_dma_map;
 
 			user_buf->dma_addrs[i] = dma_addr;
 			pa[i] = as_tagged(page_to_phys(pages[i]));
 
-			dma_sync_single_for_device(dev, dma_addr, PAGE_SIZE, DMA_BIDIRECTIONAL);
+			local_size -= min;
+			offset = 0;
 		}
 
 		reg->gpu_alloc->nents = faulted_pages;
@@ -1813,20 +1794,10 @@ KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE
 	return reg;
 
 unwind_dma_map:
-	dma_mapped_pages = i;
-	/* Run the unmap loop in the same order as map loop, and perform again
-	 * CPU cache synchronization to re-write the content of dirty CPU caches
-	 * to memory. This precautionary measure is kept here to keep this code
-	 * aligned with kbase_jd_user_buf_map() to allow for a potential refactor
-	 * in the future.
-	 */
-	for (i = 0; i < dma_mapped_pages; i++) {
-		dma_addr_t dma_addr = user_buf->dma_addrs[i];
-
-		dma_sync_single_for_device(dev, dma_addr, PAGE_SIZE, DMA_BIDIRECTIONAL);
-		dma_unmap_page_attrs(dev, dma_addr, PAGE_SIZE,
-				     write ? DMA_BIDIRECTIONAL : DMA_TO_DEVICE,
-				     DMA_ATTR_SKIP_CPU_SYNC);
+	while (i--) {
+		dma_unmap_page(kctx->kbdev->dev,
+				user_buf->dma_addrs[i],
+				PAGE_SIZE, DMA_BIDIRECTIONAL);
 	}
 fault_mismatch:
 	if (pages) {
@@ -1846,6 +1817,7 @@ no_alloc_obj:
 no_region:
 bad_size:
 	return NULL;
+
 }
 
 
@@ -2111,10 +2083,7 @@ int kbase_mem_import(struct kbase_context *kctx, enum base_mem_import_type type,
 		/* Remove COHERENT_SYSTEM flag if coherent mem is unavailable */
 		*flags &= ~BASE_MEM_COHERENT_SYSTEM;
 	}
-	if (((*flags & BASE_MEM_CACHED_CPU) == 0) && (type == BASE_MEM_IMPORT_TYPE_USER_BUFFER)) {
-		dev_warn(kctx->kbdev->dev, "USER_BUFFER must be CPU cached");
-		goto bad_flags;
-	}
+
 	if ((padding != 0) && (type != BASE_MEM_IMPORT_TYPE_UMM)) {
 		dev_warn(kctx->kbdev->dev,
 				"padding is only supported for UMM");
@@ -2424,23 +2393,6 @@ int kbase_mem_shrink(struct kbase_context *const kctx,
 		return -EINVAL;
 
 	delta = old_pages - new_pages;
-
-#ifdef CONFIG_MALI_2MB_ALLOC
-		struct tagged_addr *start_free = reg->gpu_alloc->pages + new_pages;
-
-		/* Move the end of new committed range to a valid location.
-		 * This mirrors the adjustment done inside kbase_free_phy_pages_helper().
-		 */
-		while (delta && is_huge(*start_free) && !is_huge_head(*start_free)) {
-			start_free++;
-			new_pages++;
-			delta--;
-		}
-
-		if (!delta)
-			return 0;
-	}
-#endif
 
 	/* Update the GPU mapping */
 	err = kbase_mem_shrink_gpu_mapping(kctx, reg,
@@ -3272,29 +3224,79 @@ static void kbasep_add_mm_counter(struct mm_struct *mm, int member, long value)
 
 void kbasep_os_process_page_usage_update(struct kbase_context *kctx, int pages)
 {
-	struct mm_struct *mm = kctx->process_mm;
+	struct mm_struct *mm;
 
-	if (unlikely(!mm))
-		return;
-
-	atomic_add(pages, &kctx->nonmapped_pages);
+	rcu_read_lock();
+	mm = rcu_dereference(kctx->process_mm);
+	if (mm) {
+		atomic_add(pages, &kctx->nonmapped_pages);
 #ifdef SPLIT_RSS_COUNTING
-	kbasep_add_mm_counter(mm, MM_FILEPAGES, pages);
+		kbasep_add_mm_counter(mm, MM_FILEPAGES, pages);
+#else
+		spin_lock(&mm->page_table_lock);
+		kbasep_add_mm_counter(mm, MM_FILEPAGES, pages);
+		spin_unlock(&mm->page_table_lock);
+#endif
+	}
+	rcu_read_unlock();
+}
+
+static void kbasep_os_process_page_usage_drain(struct kbase_context *kctx)
+{
+	int pages;
+	struct mm_struct *mm;
+
+	spin_lock(&kctx->mm_update_lock);
+	mm = rcu_dereference_protected(kctx->process_mm, lockdep_is_held(&kctx->mm_update_lock));
+	if (!mm) {
+		spin_unlock(&kctx->mm_update_lock);
+		return;
+	}
+
+	rcu_assign_pointer(kctx->process_mm, NULL);
+	spin_unlock(&kctx->mm_update_lock);
+	synchronize_rcu();
+
+	pages = atomic_xchg(&kctx->nonmapped_pages, 0);
+#ifdef SPLIT_RSS_COUNTING
+	kbasep_add_mm_counter(mm, MM_FILEPAGES, -pages);
 #else
 	spin_lock(&mm->page_table_lock);
-	kbasep_add_mm_counter(mm, MM_FILEPAGES, pages);
+	kbasep_add_mm_counter(mm, MM_FILEPAGES, -pages);
 	spin_unlock(&mm->page_table_lock);
 #endif
 }
 
+static void kbase_special_vm_close(struct vm_area_struct *vma)
+{
+	struct kbase_context *kctx;
+
+	kctx = vma->vm_private_data;
+	kbasep_os_process_page_usage_drain(kctx);
+}
+
+static const struct vm_operations_struct kbase_vm_special_ops = {
+	.close = kbase_special_vm_close,
+};
+
 static int kbase_tracking_page_setup(struct kbase_context *kctx, struct vm_area_struct *vma)
 {
-	if (vma_pages(vma) != 1)
-		return -EINVAL;
+	/* check that this is the only tracking page */
+	spin_lock(&kctx->mm_update_lock);
+	if (rcu_dereference_protected(kctx->process_mm, lockdep_is_held(&kctx->mm_update_lock))) {
+		spin_unlock(&kctx->mm_update_lock);
+		return -EFAULT;
+	}
+
+	rcu_assign_pointer(kctx->process_mm, current->mm);
+
+	spin_unlock(&kctx->mm_update_lock);
 
 	/* no real access */
 	vma->vm_flags &= ~(VM_READ | VM_MAYREAD | VM_WRITE | VM_MAYWRITE | VM_EXEC | VM_MAYEXEC);
 	vma->vm_flags |= VM_DONTCOPY | VM_DONTEXPAND | VM_DONTDUMP | VM_IO;
+	vma->vm_ops = &kbase_vm_special_ops;
+	vma->vm_private_data = kctx;
 
 	return 0;
 }

@@ -2577,12 +2577,23 @@ static int coulomb_interrupt_lt_set(struct mtk_gauge *gauge,
 static int en_h_vbat_set(struct mtk_gauge *gauge,
 	struct mtk_gauge_sysfs_field_info *attr, int val)
 {
+	struct mtk_battery *gm;
+
+	gm = gauge->gm;
+	gm->sw_low_battery_ht_en = val;
+	pr_info("%s, sw_low_battery_ht_en = %d\n", gm->sw_low_battery_ht_en);
+
 	return 0;
 }
 
 static int en_l_vbat_set(struct mtk_gauge *gauge,
 	struct mtk_gauge_sysfs_field_info *attr, int val)
 {
+	struct mtk_battery *gm;
+
+	gm = gauge->gm;
+	gm->sw_low_battery_lt_en = val;
+	pr_info("%s, sw_low_battery_lt_en = %d\n", gm->sw_low_battery_lt_en);
 
 	return 0;
 }
@@ -3226,7 +3237,7 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
 	}
 
 	gauge->hw_status.car_tune_value = 1000;
-	gauge->hw_status.r_fg_value = 100;//zxs //50;
+	gauge->hw_status.r_fg_value = 50;
 	gauge->attr = mt6357_sysfs_field_tbl;
 
 	if (battery_psy_init(pdev))

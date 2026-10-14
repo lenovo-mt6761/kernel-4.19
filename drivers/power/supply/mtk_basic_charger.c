@@ -67,6 +67,9 @@ static int _uA_to_mA(int uA)
 		return uA / 1000;
 }
 
+extern int g_maintenance_level;
+int cc_short = 0;
+
 static void select_cv(struct mtk_charger *info)
 {
 	u32 constant_voltage;
@@ -77,6 +80,17 @@ static void select_cv(struct mtk_charger *info)
 			return;
 		}
 
+	if (g_maintenance_level == 1) {
+		info->setting.cv = 4352000;
+		return;
+	} else if (g_maintenance_level == 2) {
+		info->setting.cv = 4304000;
+		return;
+	} else if (g_maintenance_level == 3) {
+		info->setting.cv = 4176000;
+		return;
+	}
+
 	constant_voltage = info->data.battery_cv;
 	info->setting.cv = constant_voltage;
 }
@@ -86,10 +100,11 @@ static bool is_typec_adapter(struct mtk_charger *info)
 	int rp;
 
 	rp = adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL);
-	if (info->pd_type == MTK_PD_CONNECT_TYPEC_ONLY_SNK &&
-			rp != 500 &&
-			info->chr_type != POWER_SUPPLY_TYPE_USB &&
-			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP)
+	chr_err("pd_type = %d, rp = %d, chr_type = %d\n", info->pd_type, rp, info->chr_type);
+	if ((info->pd_type == MTK_PD_CONNECT_PE_READY_SNK ||
+            info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
+            info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO) &&
+			rp != 500)
 		return true;
 
 	return false;
@@ -97,6 +112,8 @@ static bool is_typec_adapter(struct mtk_charger *info)
 
 static bool support_fast_charging(struct mtk_charger *info)
 {
+	return false;
+#if 0
 	struct chg_alg_device *alg;
 	int i = 0, state = 0;
 	bool ret = false;
@@ -117,6 +134,7 @@ static bool support_fast_charging(struct mtk_charger *info)
 		}
 	}
 	return ret;
+#endif
 }
 
 static bool select_charging_current_limit(struct mtk_charger *info,
@@ -210,21 +228,18 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 					info->data.max_dmivr_charger_current;
 		}
 		if (is_typec_adapter(info)) {
-			if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL)
-				== 3000) {
-				pdata->input_current_limit = 3000000;
-				pdata->charging_current_limit = 3000000;
-			} else if (adapter_dev_get_property(info->pd_adapter,
-				TYPEC_RP_LEVEL) == 1500) {
-				pdata->input_current_limit = 1500000;
-				pdata->charging_current_limit = 2000000;
+			if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL) >= 1500) {
+				pdata->input_current_limit = 1000000;
+				pdata->charging_current_limit = 600000;
+				cc_short = 1;
 			} else {
 				chr_err("type-C: inquire rp error\n");
 				pdata->input_current_limit = 500000;
 				pdata->charging_current_limit = 500000;
+				cc_short = 0;
 			}
 
-			chr_err("type-C:%d current:%d\n",
+			chr_err("type-C:%d rp_level:%d\n",
 				info->pd_type,
 				adapter_dev_get_property(info->pd_adapter,
 					TYPEC_RP_LEVEL));
@@ -235,12 +250,25 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		if (IS_ENABLED(CONFIG_USBIF_COMPLIANCE)
 			&& info->chr_type == POWER_SUPPLY_TYPE_USB)
 			chr_debug("USBIF & STAND_HOST skip current check\n");
-		else {
-			if (info->sw_jeita.sm == TEMP_T0_TO_T1) {
-				pdata->input_current_limit = 500000;
-				pdata->charging_current_limit = 350000;
+		else if ((info->chr_type == POWER_SUPPLY_TYPE_USB_DCP) || (info->chr_type == POWER_SUPPLY_TYPE_USB_CDP)) {
+			chr_err("standard charger, limit the current due to sw jeita\n");
+			if (info->sw_jeita.sm == TEMP_T1_TO_T2) {
+				chr_err("temp between T1/T2, limit the current to 1500/1000 mA\n");
+				pdata->input_current_limit = 1500000;
+				pdata->charging_current_limit = 1000000;
+			} else if (info->sw_jeita.sm == TEMP_T3_TO_T4) {
+				chr_err("temp between T3/T4, limit the current to 1500/1000 mA\n");
+				pdata->input_current_limit = 1500000;
+				pdata->charging_current_limit = 1000000;
 			}
 		}
+	}
+
+	if((info->chr_type == POWER_SUPPLY_TYPE_USB_DCP)&&(info->pd_type == MTK_PD_CONNECT_TYPEC_ONLY_SNK)&&
+			(adapter_dev_get_property(info->pd_adapter,TYPEC_RP_STATE) == MTK_TYPEC_ATTACHED_NORP_SRC)){
+		pdata->input_current_limit = 500000;
+		pdata->charging_current_limit = 500000;
+		chr_err("norp dcp adapter, current limit 500mA\n");
 	}
 
 	if (pdata->thermal_charging_current_limit != -1) {
@@ -329,8 +357,6 @@ done:
 
 	return is_basic;
 }
-extern int  mtk_battery_external_power_changed_recover(void);
-extern int  mtk_battery_external_power_changed_full(void);
 
 static int do_algorithm(struct mtk_charger *info)
 {
@@ -350,12 +376,9 @@ static int do_algorithm(struct mtk_charger *info)
 	if (info->is_chg_done != chg_done) {
 		if (chg_done) {
 			charger_dev_do_event(info->chg1_dev, EVENT_FULL, 0);
-     
-			mtk_battery_external_power_changed_full();
 			chr_err("%s battery full\n", __func__);
 		} else {
 			charger_dev_do_event(info->chg1_dev, EVENT_RECHARGE, 0);
-			mtk_battery_external_power_changed_recover();
 			chr_err("%s battery recharge\n", __func__);
 		}
 	}
@@ -487,6 +510,29 @@ static int enable_charging(struct mtk_charger *info,
 	return 0;
 }
 
+static int enable_hz(struct mtk_charger *info,
+						bool en)
+{
+	int i;
+	struct chg_alg_device *alg;
+
+	chr_err("%s %d\n", __func__, en);
+
+	if (en == false) {
+		for (i = 0; i < MAX_ALG_NO; i++) {
+			alg = info->alg[i];
+			if (alg == NULL)
+				continue;
+			chg_alg_stop_algo(alg);
+		}
+		charger_dev_enable_hz(info->chg1_dev, false);
+	} else {
+		charger_dev_enable_hz(info->chg1_dev, true);
+	}
+
+	return 0;
+}
+
 static int charger_dev_event(struct notifier_block *nb, unsigned long event,
 				void *v)
 {
@@ -537,6 +583,7 @@ int mtk_basic_charger_init(struct mtk_charger *info)
 
 	info->algo.do_algorithm = do_algorithm;
 	info->algo.enable_charging = enable_charging;
+	info->algo.enable_hz = enable_hz;
 	info->algo.do_event = charger_dev_event;
 	//info->change_current_setting = mtk_basic_charging_current;
 	return 0;

@@ -15,6 +15,7 @@
 #include <linux/power_supply.h>
 #include <mtk_musb.h>
 #include <linux/reboot.h>
+#include "adapter_class.h"
 
 /* ============================================================ */
 /* pmic control start*/
@@ -83,8 +84,8 @@ struct mtk_charger_type {
 	struct power_supply *usb_psy;
 
 	struct iio_channel *chan_vbus;
-	//struct work_struct chr_work;
-	 struct delayed_work chr_work;
+	struct work_struct chr_work;
+	struct notifier_block tcpc_nb;
 
 	enum power_supply_usb_type type;
 
@@ -92,7 +93,11 @@ struct mtk_charger_type {
 	int bc12_active;
 	u32 bootmode;
 	u32 boottype;
+	int pd_type_retry;
 };
+
+static struct mtk_charger_type *global_info;
+static void hw_bc11_done(struct mtk_charger_type *info);
 
 struct tag_bootmode {
 	u32 size;
@@ -106,6 +111,7 @@ static enum power_supply_property chr_type_properties[] = {
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_USB_TYPE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_STATUS,
 };
 
 static enum power_supply_property mt_ac_properties[] = {
@@ -114,6 +120,7 @@ static enum power_supply_property mt_ac_properties[] = {
 
 static enum power_supply_property mt_usb_properties[] = {
 	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 };
@@ -145,8 +152,9 @@ unsigned int bc11_get_register_value(struct regmap *map,
 	return value;
 }
 
-static void hw_bc11_init(struct mtk_charger_type *info)
+static int hw_bc11_init(struct mtk_charger_type *info)
 {
+	unsigned int chrdet = 0;
 #if IS_ENABLED(CONFIG_USB_MTK_HDRC)
 	int timeout = 200;
 #endif
@@ -159,6 +167,15 @@ static void hw_bc11_init(struct mtk_charger_type *info)
 			while (is_usb_rdy() == false && timeout > 0) {
 				msleep(100);
 				timeout--;
+				/* check usb online */
+				chrdet = bc11_get_register_value(info->regmap,
+						PMIC_RGS_CHRDET_ADDR,
+						PMIC_RGS_CHRDET_MASK,
+						PMIC_RGS_CHRDET_SHIFT);
+				if (!chrdet) {
+					hw_bc11_done(info);
+					return -1;
+				}
 			}
 			if (timeout == 0)
 				pr_info("CDP, timeout\n");
@@ -229,6 +246,7 @@ static void hw_bc11_init(struct mtk_charger_type *info)
 #if IS_ENABLED(CONFIG_USB_MTK_HDRC)
 	Charger_Detect_Init();
 #endif
+	return 0;
 }
 
 static unsigned int hw_bc11_DCD(struct mtk_charger_type *info)
@@ -465,11 +483,9 @@ static void dump_charger_name(int type)
 	case POWER_SUPPLY_TYPE_USB_CDP:
 		pr_info("charger type: %d, Charging USB Host\n", type);
 		break;
-#ifdef FIXME
 	case POWER_SUPPLY_TYPE_USB_FLOAT:
 		pr_info("charger type: %d, Non-standard Charger\n", type);
 		break;
-#endif
 	case POWER_SUPPLY_TYPE_USB_DCP:
 		pr_info("charger type: %d, Standard Charger\n", type);
 		break;
@@ -483,9 +499,15 @@ static int get_charger_type(struct mtk_charger_type *info)
 {
 	enum power_supply_usb_type type;
 
-	hw_bc11_init(info);
+	if (hw_bc11_init(info)) {
+		info->psy_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+		type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+		pr_info("%s: usb plug out, skip bc11\n", __func__);
+		return type;
+	}
+
 	if (hw_bc11_DCD(info)) {
-		info->psy_desc.type = POWER_SUPPLY_TYPE_USB;
+		info->psy_desc.type = POWER_SUPPLY_TYPE_USB_FLOAT;
 		type = POWER_SUPPLY_USB_TYPE_DCP;
 	} else {
 		if (hw_bc11_stepA2(info)) {
@@ -517,7 +539,7 @@ static int get_vbus_voltage(struct mtk_charger_type *info,
 {
 	int ret;
 
-	if (!IS_ERR(info->chan_vbus) && info->chan_vbus != NULL) {
+	if (!IS_ERR(info->chan_vbus)) {
 		ret = iio_read_channel_processed(info->chan_vbus, val);
 		if (ret < 0)
 			pr_notice("[%s]read fail,ret=%d\n", __func__, ret);
@@ -534,12 +556,19 @@ static int get_vbus_voltage(struct mtk_charger_type *info,
 }
 
 
-void do_charger_detect(struct mtk_charger_type *info, bool en)
+void do_charger_detect(bool en)
 {
 	union power_supply_propval prop_online = {0};
 	union power_supply_propval prop_type = {0};
 	union power_supply_propval prop_usb_type = {0};
 	int ret = 0;
+	unsigned int chrdet = 0;
+	struct mtk_charger_type *info = global_info;
+
+	if(!info) {
+		pr_err("%s, info = null\n");
+		return;
+	}
 
 #ifndef CONFIG_TCPC_CLASS
 	if (!mt_usb_is_device()) {
@@ -547,6 +576,30 @@ void do_charger_detect(struct mtk_charger_type *info, bool en)
 		return;
 	}
 #endif
+
+	msleep(300);
+	chrdet = bc11_get_register_value(info->regmap,
+			PMIC_RGS_CHRDET_ADDR,
+			PMIC_RGS_CHRDET_MASK,
+			PMIC_RGS_CHRDET_SHIFT);
+	pr_notice("%s: chrdet:%d\n", __func__, chrdet);
+	if (!chrdet) {
+		hw_bc11_done(info);
+		/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
+		/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
+		if (info->bootmode == 8 || info->bootmode == 9) {
+			pr_info("%s: Unplug Charger/USB\n", __func__);
+
+#ifndef CONFIG_TCPC_CLASS
+			pr_info("%s: system_state=%d\n", __func__,
+					system_state);
+			if (system_state != SYSTEM_POWER_OFF)
+				kernel_power_off();
+#endif
+		}
+		if (en)
+			return;
+	}
 
 	prop_online.intval = en;
 	if (en) {
@@ -556,26 +609,21 @@ void do_charger_detect(struct mtk_charger_type *info, bool en)
 				POWER_SUPPLY_PROP_TYPE, &prop_type);
 		ret = power_supply_get_property(info->psy,
 				POWER_SUPPLY_PROP_USB_TYPE, &prop_usb_type);
-		pr_notice("type:%d usb_type:%d\n", prop_type.intval, prop_usb_type.intval);
+		pr_notice("%s: type:%d usb_type:%d\n", __func__, prop_type.intval, prop_usb_type.intval);
 	} else {
 		info->psy_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
 		info->type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-	}
 		pr_notice("%s type:0 usb_type:0\n", __func__);
-     if(en)
-       {
-               mt_usb_connect();
-       }else{
-               mt_usb_disconnect();
 	}
 
+	power_supply_changed(info->usb_psy);
 	power_supply_changed(info->psy);
 }
 
 static void do_charger_detection_work(struct work_struct *data)
 {
 	struct mtk_charger_type *info = (struct mtk_charger_type *)container_of(
-				     data, struct mtk_charger_type,  chr_work.work); //by xen 20240720
+				     data, struct mtk_charger_type, chr_work);
 	unsigned int chrdet = 0;
 
 	chrdet = bc11_get_register_value(info->regmap,
@@ -585,7 +633,7 @@ static void do_charger_detection_work(struct work_struct *data)
 
 	pr_notice("%s: chrdet:%d\n", __func__, chrdet);
 	if (chrdet)
-		do_charger_detect(info, chrdet);
+		do_charger_detect(chrdet);
 	else {
 		hw_bc11_done(info);
 		/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
@@ -629,11 +677,12 @@ irqreturn_t chrdet_int_handler(int irq, void *data)
 		}
 	}
 	pr_notice("%s: chrdet:%d\n", __func__, chrdet);
-	do_charger_detect(info, chrdet);
+	//do_charger_detect(info, chrdet);
 
 	return IRQ_HANDLED;
 }
 
+extern int g_charging_status;
 
 static int psy_chr_type_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
@@ -641,14 +690,15 @@ static int psy_chr_type_get_property(struct power_supply *psy,
 	struct mtk_charger_type *info;
 	int vbus = 0;
 
-	//pr_notice("%s: prop:%d\n", __func__, psp);
+	pr_notice("%s: prop:%d\n", __func__, psp);
 	info = (struct mtk_charger_type *)power_supply_get_drvdata(psy);
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (info->type == POWER_SUPPLY_USB_TYPE_UNKNOWN || !info->bc12_active)
+		if (info->type == POWER_SUPPLY_USB_TYPE_UNKNOWN || !info->bc12_active) {
 			val->intval = 0;
-		else
+			info->pd_type_retry = 0;
+		} else
 			val->intval = 1;
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
@@ -660,6 +710,10 @@ static int psy_chr_type_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		get_vbus_voltage(info, &vbus);
 		val->intval = vbus;
+		break;
+	case POWER_SUPPLY_PROP_STATUS:
+		val->intval = g_charging_status;
+		pr_err(" %s status: %d \n", __func__, g_charging_status);
 		break;
 	default:
 		return -EINVAL;
@@ -674,7 +728,7 @@ int psy_chr_type_set_property(struct power_supply *psy,
 {
 	struct mtk_charger_type *info;
 
-	//pr_notice("%s: prop:%d %d\n", __func__, psp, val->intval);
+	pr_notice("%s: prop:%d %d\n", __func__, psp, val->intval);
 
 	info = (struct mtk_charger_type *)power_supply_get_drvdata(psy);
 	switch (psp) {
@@ -712,6 +766,41 @@ static int mt_ac_get_property(struct power_supply *psy,
 	return 0;
 }
 
+static enum power_supply_type get_adapter_type(struct mtk_charger_type *info)
+{
+	struct power_supply *chg_psy;
+	union power_supply_propval val;
+
+	if (info->psy_desc.type == POWER_SUPPLY_TYPE_USB_FLOAT) {
+		chg_psy = power_supply_get_by_name("mtk-master-charger");
+		if (chg_psy == NULL) {
+			pr_notice("[%s] can get charger psy\n", __func__);
+			return info->psy_desc.type;
+		}
+
+		power_supply_get_property(chg_psy, POWER_SUPPLY_PROP_REAL_TYPE, &val);
+		pr_notice("%s: pd_type:%d, pd_type_retry:%d\n", __func__, val.intval, info->pd_type_retry);
+		if (val.intval == MTK_PD_CONNECT_PE_READY_SNK ||
+				val.intval == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
+				val.intval == MTK_PD_CONNECT_PE_READY_SNK_APDO) {
+			pr_notice("%s: is pd hub\n", __func__, val.intval);
+			return POWER_SUPPLY_TYPE_USB_DCP;
+		} else {
+			if (info->pd_type_retry < 5) {
+				info->pd_type_retry++;
+				do_charger_detect(true);
+				return POWER_SUPPLY_TYPE_USB_DCP;
+			} else {
+				pr_notice("%s: float adapter or slow-plug type-a\n", __func__);
+				msleep(400);
+				do_charger_detect(true);
+				return info->psy_desc.type;
+			}
+		}
+	} else
+		return info->psy_desc.type;
+}
+
 static int mt_usb_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
 {
@@ -726,6 +815,9 @@ static int mt_usb_get_property(struct power_supply *psy,
 			val->intval = 1;
 		else
 			val->intval = 0;
+		break;
+	case POWER_SUPPLY_PROP_REAL_TYPE:
+		val->intval = get_adapter_type(info);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = 500000;
@@ -777,9 +869,9 @@ static int check_boot_mode(struct mtk_charger_type *info, struct device *dev)
 		if (!tag)
 			pr_notice("%s: failed to get atag,boot\n", __func__);
 		else {
-			//pr_notice("%s: size:0x%x tag:0x%x bootmode:0x%x boottype:0x%x\n",
-			//	__func__, tag->size, tag->tag,
-			//	tag->bootmode, tag->boottype);
+			pr_notice("%s: size:0x%x tag:0x%x bootmode:0x%x boottype:0x%x\n",
+				__func__, tag->size, tag->tag,
+				tag->bootmode, tag->boottype);
 			info->bootmode = tag->bootmode;
 			info->boottype = tag->boottype;
 		}
@@ -793,10 +885,8 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 	struct iio_channel *chan_vbus;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
-	int ret = 0;
-    int vbus = 0; //added by xen for test 20240722
 
-	//pr_notice("%s: starts\n", __func__);
+	pr_notice("%s: starts\n", __func__);
 
 	chan_vbus = devm_iio_channel_get(
 		&pdev->dev, "pmic_vbus");
@@ -871,7 +961,7 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 	if (of_property_read_u32(np, "bc12_active", &info->bc12_active) < 0)
 		pr_notice("%s: no bc12_active\n", __func__);
 
-	//pr_notice("%s: bc12_active:%d\n", __func__, info->bc12_active);
+	pr_notice("%s: bc12_active:%d\n", __func__, info->bc12_active);
 
 	if (info->bc12_active) {
 		info->ac_psy = power_supply_register(&pdev->dev,
@@ -891,23 +981,19 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 				__func__, PTR_ERR(info->usb_psy));
 			return PTR_ERR(info->usb_psy);
 		}
-  //INIT_WORK(&info->chr_work, do_charger_detection_work);
-        INIT_DELAYED_WORK(&info->chr_work, do_charger_detection_work);
-        //schedule_work(&info->chr_work); //modified by xen 20240722
-        get_vbus_voltage(info, &vbus);
-        pr_notice("%s charge vbus=%d\n", __func__, vbus);
-        if ((info->bootmode == 8)||(info->bootmode == 9)) //power off charging
-                schedule_delayed_work(&info->chr_work, 3000); //1000
-        else if ((info->bootmode == 0)&&(vbus>4000))  //get_vbus_voltage
-                schedule_delayed_work(&info->chr_work, 6000); //1000
-        else
-                schedule_delayed_work(&info->chr_work, 100); //1000
 
+		global_info = info;
+
+		INIT_WORK(&info->chr_work, do_charger_detection_work);
+		schedule_work(&info->chr_work);
+
+/*
 		ret = devm_request_threaded_irq(&pdev->dev,
 			platform_get_irq_byname(pdev, "chrdet"), NULL,
 			chrdet_int_handler, IRQF_TRIGGER_HIGH, "chrdet", info);
 		if (ret < 0)
 			pr_notice("%s request chrdet irq fail\n", __func__);
+*/
 	}
 
 	info->first_connect = true;

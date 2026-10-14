@@ -225,7 +225,6 @@ struct gce_callback_data {
 	struct mtk_vcu *vcu_ptr;
 	struct cmdq_pkt *pkt_ptr;
 	struct mtk_vcu_queue *vcu_queue;
-	int daemon_pid;
 };
 
 struct gce_ctx_info {
@@ -878,20 +877,6 @@ IS_ENABLED(CONFIG_MACH_MT6785) || IS_ENABLED(CONFIG_MACH_MT8168))
 	up(&vcu->gce_info[j].buff_sem[gce_order]);
 }
 
-static int vcu_get_daemon_pid(void)
-{
-	struct task_struct *task = NULL;
-	struct files_struct *f = NULL;
-	int daemon_pid = -1;
-
-	vcu_get_file_lock();
-	vcu_get_task(&task, &f, 0);
-	if (task != NULL)
-		daemon_pid = task->tgid;
-	vcu_put_file_lock();
-	return daemon_pid;
-}
-
 static void vcu_gce_timeout_callback(struct cmdq_cb_data data)
 {
 	struct gce_callback_data *buff;
@@ -899,32 +884,26 @@ static void vcu_gce_timeout_callback(struct cmdq_cb_data data)
 	struct list_head *p, *q;
 	struct mtk_vcu_queue *vcu_queue;
 	struct vcu_pa_pages *tmp;
-	int current_daemon_pid;
 
-	current_daemon_pid = vcu_get_daemon_pid();
 	buff = (struct gce_callback_data *)data.data;
 	vcu = buff->vcu_ptr;
 	vcu_queue = buff->vcu_queue;
 	vcu_dbg_log("%s: buff %p vcu: %p, codec_typ: %d\n",
 		__func__, buff, vcu, buff->cmdq_buff.codec_type);
 
-	if (buff->daemon_pid == current_daemon_pid) {
-		if (buff->cmdq_buff.codec_type == VCU_VENC)
-			mtk_vcodec_gce_timeout_dump(vcu->curr_ctx[VCU_VENC]);
-		else if (buff->cmdq_buff.codec_type == VCU_VDEC)
-			mtk_vcodec_gce_timeout_dump(vcu->curr_ctx[VCU_VDEC]);
-		mutex_lock(&vcu_queue->mmap_lock);
-			list_for_each_safe(p, q, &vcu_queue->pa_pages.list) {
-				tmp = list_entry(p, struct vcu_pa_pages, list);
-				pr_info("%s: vcu_pa_pages %lx kva %lx data %lx\n",
-					__func__, tmp->pa, tmp->kva,
-					*(unsigned long *)tmp->kva);
-			}
-		mutex_unlock(&vcu_queue->mmap_lock);
-	} else
-		pr_info("%s: buff->daemon_pid:%d, current_daemon_pid:%d differnt\n",
-			__func__, buff->daemon_pid, current_daemon_pid);
+	if (buff->cmdq_buff.codec_type == VCU_VENC)
+		mtk_vcodec_gce_timeout_dump(vcu->curr_ctx[VCU_VENC]);
+	else if (buff->cmdq_buff.codec_type == VCU_VDEC)
+		mtk_vcodec_gce_timeout_dump(vcu->curr_ctx[VCU_VDEC]);
 
+	mutex_lock(&vcu_queue->mmap_lock);
+	list_for_each_safe(p, q, &vcu_queue->pa_pages.list) {
+		tmp = list_entry(p, struct vcu_pa_pages, list);
+		pr_info("%s: vcu_pa_pages %lx kva %lx data %lx\n",
+			__func__, tmp->pa, tmp->kva,
+			*(unsigned long *)tmp->kva);
+	}
+	mutex_unlock(&vcu_queue->mmap_lock);
 
 }
 
@@ -1008,7 +987,6 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 
 	buff.vcu_ptr = vcu;
 	buff.vcu_queue = q;
-	buff.daemon_pid = vcu_get_daemon_pid();
 
 	while (vcu_ptr->is_entering_suspend == 1) {
 		suspend_block_cnt++;
@@ -2331,7 +2309,7 @@ int vcu_get_log(char *val, unsigned int val_len)
 	// append vcu log
 	len = strlen(val);
 	if (len < val_len)
-		SNPRINTF(val + len, val_len - 1 - len,
+		snprintf(val + len, val_len - 1 - len,
 			" %s %d", "-vcu_log", vcu_ptr->enable_vcu_dbg_log);
 
 	pr_info("[VCU] %s log_info: %s\n", __func__, val);

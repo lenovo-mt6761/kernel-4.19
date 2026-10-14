@@ -453,7 +453,8 @@ static int vidioc_venc_s_ctrl(struct v4l2_ctrl *ctrl)
 		mtk_v4l2_debug(0,
 			"V4L2_CID_MPEG_VIDEO_ENABLE_TSVC layer: %d, type: %d\n",
 			ctrl->p_new.p_u32[0], ctrl->p_new.p_u32[1]);
-			p->tsvc = ctrl->p_new.p_u32[0];
+		if (ctrl->p_new.p_u32[0] == 3)
+			p->tsvc = 1;
 		ctx->param_change |= MTK_ENCODE_PARAM_TSVC;
 		break;
 	case V4L2_CID_MPEG_MTK_ENCODE_RC_MAX_QP:
@@ -1449,11 +1450,6 @@ static int vidioc_venc_qbuf(struct file *file, void *priv,
 	mtkbuf = container_of(vb2_v4l2, struct mtk_video_enc_buf, vb);
 
 	if (buf->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-		if (IS_ERR_OR_NULL(buf->m.planes)) {
-			mtk_v4l2_err("[%d] buffer planes address %p %llx can not access",
-				ctx->id, buf->m.planes, buf->m.planes);
-			return -EIO;
-		}
 		if (buf->m.planes[0].bytesused == 0) {
 			mtkbuf->lastframe = EOS;
 			mtk_v4l2_debug(1, "[%d] index=%d Eos FB(%d,%d) vb=%p pts=%llu",
@@ -1674,20 +1670,13 @@ static int vb2ops_venc_queue_setup(struct vb2_queue *vq,
 	}
 
 	if (*nplanes) {
-		if (*nplanes != q_data->fmt->num_planes)
-			return -EINVAL;
 		for (i = 0; i < *nplanes; i++)
 			if (sizes[i] < q_data->sizeimage[i])
 				return -EINVAL;
 	} else {
 		*nplanes = q_data->fmt->num_planes;
-		for (i = 0; i < *nplanes; i++) {
+		for (i = 0; i < *nplanes; i++)
 			sizes[i] = q_data->sizeimage[i];
-			if (sizes[i] == 0) {
-				mtk_v4l2_err("plane size[%d] is 0", i);
-				return -EINVAL;
-			}
-		}
 	}
 
 	mtk_v4l2_debug(2, "[%d] nplanes %d sizeimage %d %d %d, state=%d",
@@ -2248,26 +2237,14 @@ static int mtk_venc_param_change(struct mtk_vcodec_ctx *ctx)
 
 	if (!ret &&
 	mtk_buf->param_change & MTK_ENCODE_PARAM_TSVC) {
-		mtk_v4l2_debug(2, "[%d] idx=%d, tsvc_layer=%d",
+		enc_prm.tsvc = mtk_buf->enc_params.tsvc;
+		mtk_v4l2_debug(1, "[%d] idx=%d, tsvc=%d",
 				ctx->id,
+				mtk_buf->vb.vb2_buf.index,
 				mtk_buf->enc_params.tsvc);
-		if(mtk_buf->enc_params.tsvc == 2) {
-			enc_prm.nonrefpfreq = 1;
-			enc_prm.nonrefp = 1;
-
-			ret |= venc_if_set_param(ctx,
-						 VENC_SET_PARAM_NONREFP,
-						 &enc_prm);
-
-			ret |= venc_if_set_param(ctx,
-						VENC_SET_PARAM_NONREFPFREQ,
-						&enc_prm);
-		} else if (mtk_buf->enc_params.tsvc == 1) {
-			enc_prm.nonrefp = 0;
-			ret |= venc_if_set_param(ctx,
-						 VENC_SET_PARAM_NONREFP,
-						 &enc_prm);
-		}
+		ret |= venc_if_set_param(ctx,
+					VENC_SET_PARAM_TSVC,
+					&enc_prm);
 	}
 
 	if (!ret &&
@@ -2804,7 +2781,7 @@ int mtk_vcodec_enc_ctrls_setup(struct mtk_vcodec_ctx *ctx)
 	v4l2_ctrl_new_std_menu(handler, ops,
 		V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1,
-		0, V4L2_MPEG_VIDEO_HEVC_LEVEL_1);
+		0, V4L2_MPEG_VIDEO_HEVC_LEVEL_4);
 	v4l2_ctrl_new_std_menu(handler, ops,
 		V4L2_CID_MPEG_VIDEO_HEVC_TIER,
 		V4L2_MPEG_VIDEO_HEVC_TIER_HIGH,

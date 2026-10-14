@@ -630,8 +630,7 @@ config BATTERY_GOLDFISH
 
 config BATTERY_RT5033
 	tristate "RT5033 fuel gauge support"
-	depends on I2C
-	select REGMAP_I2C
+	depends on MFD_RT5033
 	help
 	  This adds support for battery fuel gauge in Richtek RT5033 PMIC.
 	  The fuelgauge calculates and determines the battery state of charge
@@ -680,7 +679,7 @@ config BATTERY_MT6359
 	tristate "MT6359 fuel gauge support"
 	depends on MFD_MT6397
 	depends on NET
-	default m
+	default n
 	help
 	  Say Y to enable support for MT6359 battery driver.
 	  it measure battery current and temperature to provide
@@ -771,15 +770,6 @@ config CHARGER_RT9458
 	  Richtek RT9458 driver.
 	  It depends on
 	  the config MTK_CHARGER.
-
-config MTK_ETA6937_SUPPORT
-	bool "MTK_ETA6937_SUPPORT"
-	default n
-	help
-	  This is to enable MediaTek supports to ETA6937.
-	  It depends on config MTK_SMART_BATTERY
-	  and config MTK_SWCHR_SUPPORT
-	  Set to Yes if ETA6937 is used.
 
 config CHARGER_RT9465
 	bool "Charger Driver for Richtek RT9465 Charger IC"

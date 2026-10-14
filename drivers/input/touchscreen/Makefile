@@ -76,7 +76,6 @@ endif
 ifeq ($(CONFIG_TOUCHSCREEN_MTK_GT5688),y)
 obj-$(CONFIG_TOUCHSCREEN_MTK)		+= mediatek/
 endif
-obj-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI) += NT36532/
 obj-$(CONFIG_TOUCHSCREEN_MTK_NT36572_COMMON)   +=  nt36572_common/
 obj-$(CONFIG_TOUCHSCREEN_MIGOR)		+= migor_ts.o
 obj-$(CONFIG_TOUCHSCREEN_MMS114)	+= mms114.o
@@ -136,4 +135,5 @@ obj-$(CONFIG_TOUCHSCREEN_MTK_FOCALTECH_FHD)	+= focaltech_fhd_touch/
 obj-$(CONFIG_TOUCHSCREEN_MTK_SYNAPTICS_I2C_RMI4)	+=  synaptics_i2c_rmi4/
 TOUCH_LISTS := $(subst ",,$(CONFIG_TOUCHSCREEN_MTK_TOUCH))
 obj-y += $(foreach TOUCH,$(TOUCH_LISTS),$(TOUCH)/)
-obj-y	+= mediatek/
+
+obj-$(CONFIG_TOUCHSCREEN_MTK)		+= mediatek/

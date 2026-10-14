@@ -7,6 +7,11 @@
 /*#include "himax_ic_core.h"*/
 #include "himax_inspection.h"
 #include "himax_modular_table.h"
+/* TB301FU (sjllls): stock kernel has no legacy upmu_is_chr_det(); query
+ * the charger power supply directly instead (same semantics as the
+ * legacy mt_charger implementation in mtk_chg_type_det.c).
+ */
+#include <linux/power_supply.h>
 /*rotate*/
 
 #if defined(CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW)
@@ -1714,7 +1719,22 @@ void himax_cable_detect_func(bool force_renew)
 	/*u32 connect_status = 0;*/
 	uint8_t connect_status = 0;
 
-	connect_status = upmu_is_chr_det();/*USB_detect_flag;*/
+	/* TB301FU (sjllls): upmu_is_chr_det() does not exist in the stock
+	 * kernel; read POWER_SUPPLY_PROP_ONLINE from the "charger" supply
+	 * exactly like the legacy mt_charger implementation did.
+	 */
+	{
+		struct power_supply *chg_psy = power_supply_get_by_name("charger");
+		union power_supply_propval val = {0};
+
+		connect_status = 0;
+		if (chg_psy) {
+			if (!power_supply_get_property(chg_psy,
+					POWER_SUPPLY_PROP_ONLINE, &val))
+				connect_status = val.intval ? 1 : 0;
+			power_supply_put(chg_psy);
+		}
+	}
 	ts = private_ts;
 
 	/* I("Touch: cable status=%d, cable_config=%p, usb_connected=%d\n",*/

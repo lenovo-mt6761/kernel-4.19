@@ -5231,23 +5231,10 @@ int kbase_backend_devfreq_init(struct kbase_device *kbdev)
 	return 0;
 }
 
-/* the lock prove have false alarm when driver probe. skip it*/
-#define MTK_SKIP_LOCK_PROVE 1
-
-#if MTK_SKIP_LOCK_PROVE
-#define RETURN_ERROR(X) do { lockdep_on(); return X; } while (0)
-#else
-#define RETURN_ERROR(X) do { return X; } while (0)
-#endif
-
 static int kbase_platform_device_probe(struct platform_device *pdev)
 {
 	struct kbase_device *kbdev;
 	int err = 0;
-
-#if MTK_SKIP_LOCK_PROVE
-	lockdep_off();
-#endif
 
 	// *** MTK *** : make sure gpufreq driver is ready
 	pr_info("%s start\n", __func__);
@@ -5262,7 +5249,7 @@ static int kbase_platform_device_probe(struct platform_device *pdev)
 	kbdev = kbase_device_alloc();
 	if (!kbdev) {
 		dev_err(&pdev->dev, "Allocate device failed\n");
-		RETURN_ERROR(-ENOMEM);
+		return -ENOMEM;
 	}
 
 	kbdev->dev = &pdev->dev;
@@ -5302,7 +5289,7 @@ static int kbase_platform_device_probe(struct platform_device *pdev)
 #endif
 	}
 
-	RETURN_ERROR(err);
+	return err;
 }
 
 #undef KBASEP_DEFAULT_REGISTER_HISTORY_SIZE

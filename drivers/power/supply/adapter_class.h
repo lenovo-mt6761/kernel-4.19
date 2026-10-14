@@ -42,9 +42,27 @@ enum adapter_event {
 	MTK_TYPEC_HRESET_STATUS,
 };
 
+enum adapter_rp_type {
+    MTK_TYPEC_UNATTACHED = 0,
+    MTK_TYPEC_ATTACHED_SNK,
+    MTK_TYPEC_ATTACHED_SRC,
+    MTK_TYPEC_ATTACHED_AUDIO,
+    MTK_TYPEC_ATTACHED_DEBUG,           /* Rd, Rd */
+
+/* CONFIG_TYPEC_CAP_DBGACC_SNK */
+    MTK_TYPEC_ATTACHED_DBGACC_SNK,      /* Rp, Rp */
+
+/* CONFIG_TYPEC_CAP_CUSTOM_SRC */
+    MTK_TYPEC_ATTACHED_CUSTOM_SRC,      /* Same Rp */
+
+/* CONFIG_TYPEC_CAP_NORP_SRC */
+    MTK_TYPEC_ATTACHED_NORP_SRC,        /* No Rp */
+};
+
 enum adapter_property {
 	TYPEC_RP_LEVEL,
 	PD_TYPE,
+	TYPEC_RP_STATE,
 };
 
 enum adapter_cap_type {

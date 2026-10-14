@@ -218,7 +218,6 @@ static ssize_t power_ro_lock_store(struct device *dev,
 		goto out_put;
 	}
 	req_to_mmc_queue_req(req)->drv_op = MMC_DRV_OP_BOOT_WP;
-	req_to_mmc_queue_req(req)->drv_op_result = -EIO;
 	blk_execute_rq(mq->queue, NULL, req, 0);
 	ret = req_to_mmc_queue_req(req)->drv_op_result;
 	blk_put_request(req);
@@ -561,7 +560,6 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 	}
 
 	mmc_wait_for_req(card->host, &mrq);
-	memcpy(&idata->ic.response, cmd.resp, sizeof(cmd.resp));
 
 	if (cmd.error) {
 		dev_err(mmc_dev(card->host), "%s: cmd error %d\n",
@@ -611,6 +609,8 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 	if (idata->ic.postsleep_min_us)
 		usleep_range(idata->ic.postsleep_min_us, idata->ic.postsleep_max_us);
 
+	memcpy(&(idata->ic.response), cmd.resp, sizeof(cmd.resp));
+
 	if (idata->rpmb || (cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
 		/*
 		 * Ensure RPMB/R1B command has completed by polling CMD13
@@ -658,7 +658,6 @@ static int mmc_blk_ioctl_cmd(struct mmc_blk_data *md,
 	idatas[0] = idata;
 	req_to_mmc_queue_req(req)->drv_op =
 		rpmb ? MMC_DRV_OP_IOCTL_RPMB : MMC_DRV_OP_IOCTL;
-	req_to_mmc_queue_req(req)->drv_op_result = -EIO;
 	req_to_mmc_queue_req(req)->drv_op_data = idatas;
 	req_to_mmc_queue_req(req)->ioc_count = 1;
 	blk_execute_rq(mq->queue, NULL, req, 0);
@@ -728,7 +727,6 @@ static int mmc_blk_ioctl_multi_cmd(struct mmc_blk_data *md,
 	}
 	req_to_mmc_queue_req(req)->drv_op =
 		rpmb ? MMC_DRV_OP_IOCTL_RPMB : MMC_DRV_OP_IOCTL;
-	req_to_mmc_queue_req(req)->drv_op_result = -EIO;
 	req_to_mmc_queue_req(req)->drv_op_data = idata;
 	req_to_mmc_queue_req(req)->ioc_count = num_of_cmds;
 	blk_execute_rq(mq->queue, NULL, req, 0);
@@ -747,226 +745,6 @@ cmd_err:
 	}
 	kfree(idata);
 	return ioc_err ? ioc_err : err;
-}
-
-#define MMC_BLK_NO_WP           0
-#define MMC_BLK_PARTIALLY_WP    1
-#define MMC_BLK_FULLY_WP        2
-static int mmc_blk_check_disk_range_wp(struct gendisk *disk,
-	sector_t part_start, sector_t part_nr_sects)
-{
-	struct mmc_command cmd = {0};
-	struct mmc_request mrq = {NULL};
-	struct mmc_data data = {0};
-	struct mmc_blk_data *md;
-	struct mmc_card *card;
-	struct scatterlist sg;
-	unsigned char *buf = NULL, status;
-	sector_t start, end, quot;
-	sector_t wp_grp_rem, wp_grp_total, wp_grp_found, status_query_cnt;
-	unsigned int remain;
-	int err = 0, i, j, k;
-	u8 boot_wp_status = 0;
-#if defined(CONFIG_MTK_EMMC_CQ_SUPPORT) || defined(CONFIG_MTK_EMMC_HW_CQ)
-	bool cmdq_en = false;
-#endif
-
-	md = mmc_blk_get(disk);
-	if (!md)
-		return -EINVAL;
-
-	if (!md->queue.card) {
-		err = -EINVAL;
-		goto out2;
-	}
-
-	card = md->queue.card;
-	/* NMCARD use a eMMC4.5-like protocol but it is extern storage,
-	 * no need check WP status.
-	 */
-	if (!mmc_card_mmc(card) ||
-		(card->host->caps2 & MMC_CAP2_NMCARD) ||
-		md->part_type == EXT_CSD_PART_CONFIG_ACC_RPMB) {
-		err = MMC_BLK_NO_WP;
-		goto out2;
-	}
-
-	/* BOOT_WP_STATUS in EXT_CSD:
-	 * |-----bit[7:4]-----|-------bit[3:2]--------|-------bit[1:0]--------|
-	 * |-----reserved-----|----boot1 wp status----|----boot0 wp status----|
-	 * boot0 area wp type:depending on bit[1:0]
-	 * 0->not wp; 1->power on wp; 2->permanent wp; 3:reserved value
-	 * boot1 area wp type:depending on bit[3:2]
-	 * 0->not wp; 1->power on wp; 2->permanent wp; 3:reserved value
-	 */
-	if (md->part_type == EXT_CSD_PART_CONFIG_ACC_BOOT0) {
-		boot_wp_status = card->ext_csd.boot_wp_status & 0x3;
-		if (boot_wp_status == 0x1 || boot_wp_status == 0x2) {
-			pr_notice("[%s]%s is fully write protected\n", __func__,
-				disk->disk_name);
-			err = MMC_BLK_FULLY_WP;
-		} else
-			err = MMC_BLK_NO_WP;
-		goto out2;
-	}
-
-	/* EXT_CSD_PART_CONFIG_ACC_BOOT0 + 1 <=> BOOT1 */
-	if (md->part_type == (EXT_CSD_PART_CONFIG_ACC_BOOT0 + 1)) {
-		boot_wp_status = (card->ext_csd.boot_wp_status >> 2) & 0x3;
-		if (boot_wp_status == 0x1 || boot_wp_status == 0x2) {
-			pr_notice("[%s]%s is fully write protected\n", __func__,
-				disk->disk_name);
-			err = MMC_BLK_FULLY_WP;
-		} else
-			err = MMC_BLK_NO_WP;
-		goto out2;
-	}
-	if (!card->wp_grp_size) {
-		pr_notice("[%s]Write protect group size cannot be 0!\n", __func__);
-		err = -EINVAL;
-		goto out2;
-	}
-
-	start = part_start;
-	quot = start;
-	quot = div_u64_rem(quot, card->wp_grp_size, &remain);
-	if (remain) {
-		pr_notice("[%s]Start 0x%llx of disk %s not write group aligned\n", __func__,
-			(unsigned long long)part_start, disk->disk_name);
-		start -= remain;
-	}
-
-	end = part_start + part_nr_sects;
-	quot = end;
-	quot = div_u64_rem(quot, card->wp_grp_size, &remain);
-	if (remain) {
-		pr_notice("[%s]End 0x%llx of disk %s not write group aligned\n", __func__,
-			(unsigned long long)part_start, disk->disk_name);
-		end += card->wp_grp_size - remain;
-	}
-	wp_grp_total = end - start;
-	wp_grp_rem = div_u64(wp_grp_total, card->wp_grp_size);
-	wp_grp_found = 0;
-
-	cmd.opcode = MMC_SEND_WRITE_PROT_TYPE;
-	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
-
-	buf = kmalloc(8, GFP_KERNEL);
-	if (!buf) {
-		err = -ENOMEM;
-		goto out2;
-	}
-	sg_init_one(&sg, buf, 8);
-
-	data.blksz = 8;
-	data.blocks = 1;
-	data.flags = MMC_DATA_READ;
-	data.sg = &sg;
-	data.sg_len = 1;
-	mmc_set_data_timeout(&data, card);
-
-	mrq.cmd = &cmd;
-	mrq.data = &data;
-
-	mmc_get_card(card, NULL);
-
-	err = mmc_blk_part_switch(card, md->part_type);
-	if (err) {
-		err = -EIO;
-		goto out;
-	}
-
-#if defined(CONFIG_MTK_EMMC_CQ_SUPPORT) || defined(CONFIG_MTK_EMMC_HW_CQ)
-	cmdq_en = !!mmc_card_cmdq(card);
-	if (cmdq_en) {
-		err = mmc_cmdq_disable(card);
-		if (err) {
-			pr_notice("%s, %s: disable cmdq error %d\n",
-				__func__, mmc_hostname(card->host), err);
-			err = -EIO;
-			goto out;
-		}
-	}
-#endif
-
-	status_query_cnt = (wp_grp_total + 31) / 32;
-	for (i = 0; i < status_query_cnt; i++) {
-		cmd.arg = start + i * card->wp_grp_size * 32;
-		mmc_wait_for_req(card->host, &mrq);
-		if (cmd.error) {
-			pr_notice("%s: cmd error %d\n", __func__, cmd.error);
-			err = -EIO;
-			goto out;
-		}
-
-		/* wp status is returned in 8 bytes.
-		 * The 8 bytes is regarded as 64-bits bit-stream:
-		 * +--------+--------+-------------------------+--------+
-		 * | byte 7 | byte 6 |           ...           | byte 0 |
-		 * |  bits  |  bits  |                         |  bits  |
-		 * |76543210|76543210|                         |76543210|
-		 * +--------+--------+-------------------------+--------+
-		 *   The 2 LSBits represent write-protect group status of
-		 *       the lowest address group being queried.
-		 *   The 2 MSBits represent write-protect group status of
-		 *       the highst address group being queried.
-		 */
-		/* Check write-protect group status from lowest address
-		 *   group to highest address group
-		 */
-		for (j = 0; j < 8; j++) {
-			status = buf[7 - j];
-			for (k = 0; k < 8; k += 2) {
-				if (status & (3 << k))
-					wp_grp_found++;
-				wp_grp_rem--;
-				if (!wp_grp_rem)
-					goto out;
-			}
-		}
-
-		memset(buf, 0, 8);
-	}
-
-out:
-#if defined(CONFIG_MTK_EMMC_CQ_SUPPORT) || defined(CONFIG_MTK_EMMC_HW_CQ)
-	if (cmdq_en) {
-		err = mmc_cmdq_enable(card);
-		if (err) {
-			pr_notice("%s, %s: enable cmdq error %d\n",
-				__func__, mmc_hostname(card->host), err);
-			err = -EIO;
-		}
-	}
-#endif
-
-	mmc_put_card(card, NULL);
-	if (!wp_grp_rem) {
-		if (!wp_grp_found)
-			err = MMC_BLK_NO_WP;
-		else if (wp_grp_found == wp_grp_total) {
-			pr_notice("[%s]0x%llx ~ 0x%llx of %s is fully write protected\n",
-				__func__,
-				(unsigned long long)part_start,
-				(unsigned long long)part_start + part_nr_sects,
-				disk->disk_name);
-			err = MMC_BLK_FULLY_WP;
-		} else {
-			pr_notice("[%s]0x%llx ~ 0x%llx of %s is partially write protected\n",
-				__func__,
-				(unsigned long long)part_start,
-				(unsigned long long)part_start + part_nr_sects,
-				disk->disk_name);
-			err = MMC_BLK_PARTIALLY_WP;
-		}
-	}
-
-	kfree(buf);
-
-out2:
-	mmc_blk_put(md);
-
-	return err;
 }
 
 #ifdef CONFIG_MTK_EMMC_SUPPORT_OTP
@@ -1097,17 +875,14 @@ static const struct block_device_operations mmc_bdops = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl		= mmc_blk_compat_ioctl,
 #endif
-	.check_disk_range_wp	= mmc_blk_check_disk_range_wp,
 };
 
 static int mmc_blk_part_switch_pre(struct mmc_card *card,
 				   unsigned int part_type)
 {
-	const unsigned int mask = EXT_CSD_PART_CONFIG_ACC_MASK;
-	const unsigned int rpmb = EXT_CSD_PART_CONFIG_ACC_RPMB;
 	int ret = 0;
 
-	if ((part_type & mask) == rpmb) {
+	if (part_type == EXT_CSD_PART_CONFIG_ACC_RPMB) {
 		if (card->ext_csd.cmdq_en) {
 			ret = mmc_cmdq_disable(card);
 			if (ret)
@@ -1122,11 +897,9 @@ static int mmc_blk_part_switch_pre(struct mmc_card *card,
 static int mmc_blk_part_switch_post(struct mmc_card *card,
 				    unsigned int part_type)
 {
-	const unsigned int mask = EXT_CSD_PART_CONFIG_ACC_MASK;
-	const unsigned int rpmb = EXT_CSD_PART_CONFIG_ACC_RPMB;
 	int ret = 0;
 
-	if ((part_type & mask) == rpmb) {
+	if (part_type == EXT_CSD_PART_CONFIG_ACC_RPMB) {
 		mmc_retune_unpause(card->host);
 		if (card->reenable_cmdq && !card->ext_csd.cmdq_en)
 			ret = mmc_cmdq_enable(card);
@@ -1327,12 +1100,6 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 
 	switch (mq_rq->drv_op) {
 	case MMC_DRV_OP_IOCTL:
-		if (card->ext_csd.cmdq_en) {
-			ret = mmc_cmdq_disable(card);
-			if (ret)
-				break;
-		}
-		/* fallthrough */
 	case MMC_DRV_OP_IOCTL_RPMB:
 		idata = mq_rq->drv_op_data;
 		for (i = 0, ret = 0; i < mq_rq->ioc_count; i++) {
@@ -1343,8 +1110,6 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		/* Always switch back to main area after RPMB access */
 		if (rpmb_ioctl)
 			mmc_blk_part_switch(card, 0);
-		else if (card->reenable_cmdq && !card->ext_csd.cmdq_en)
-			mmc_cmdq_enable(card);
 		break;
 	case MMC_DRV_OP_BOOT_WP:
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BOOT_WP,
@@ -1407,7 +1172,7 @@ static void mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 					 arg == MMC_TRIM_ARG ?
 					 INAND_CMD38_ARG_TRIM :
 					 INAND_CMD38_ARG_ERASE,
-					 card->ext_csd.generic_cmd6_time);
+					 0);
 		}
 		if (!err)
 			err = mmc_erase(card, from, nr, arg);
@@ -1449,7 +1214,7 @@ retry:
 				 arg == MMC_SECURE_TRIM1_ARG ?
 				 INAND_CMD38_ARG_SECTRIM1 :
 				 INAND_CMD38_ARG_SECERASE,
-				 card->ext_csd.generic_cmd6_time);
+				 0);
 		if (err)
 			goto out_retry;
 	}
@@ -1467,7 +1232,7 @@ retry:
 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					 INAND_CMD38_ARG_EXT_CSD,
 					 INAND_CMD38_ARG_SECTRIM2,
-					 card->ext_csd.generic_cmd6_time);
+					 0);
 			if (err)
 				goto out_retry;
 		}
@@ -1754,8 +1519,6 @@ static void mmc_blk_cqe_complete_rq(struct mmc_queue *mq, struct request *req)
 			mt_biolog_cqhci_complete(req->tag);
 			__blk_mq_end_request(req, BLK_STS_OK);
 		}
-	} else if (mq->in_recovery) {
-		blk_mq_requeue_request(req, true);
 	} else {
 		blk_mq_end_request(req, BLK_STS_OK);
 	}
@@ -1788,7 +1551,8 @@ void mmc_blk_cqe_recovery(struct mmc_queue *mq)
 	err = mmc_cqe_recovery(host);
 	if (err)
 		mmc_blk_reset(mq->blkdata, host, MMC_BLK_CQE_RECOVERY);
-	mmc_blk_reset_success(mq->blkdata, MMC_BLK_CQE_RECOVERY);
+	else
+		mmc_blk_reset_success(mq->blkdata, MMC_BLK_CQE_RECOVERY);
 
 	pr_debug("%s: CQE recovery done\n", mmc_hostname(host));
 }
@@ -2031,13 +1795,12 @@ static void mmc_blk_read_single(struct mmc_queue *mq, struct request *req)
 			mmc_blk_rw_rq_prep(mqrq, card, 1, mq);
 
 			mmc_wait_for_req(host, mrq);
-
 			err = mmc_send_status(card, &status);
 			if (err)
 				goto error_exit;
-
+			
 			if (!mmc_host_is_spi(host) &&
-			    !mmc_blk_in_tran_state(status)) {
+				!mmc_blk_in_tran_state(status)) {
 				err = mmc_blk_fix_state(card, req);
 				if (err)
 					goto error_exit;
@@ -2045,6 +1808,7 @@ static void mmc_blk_read_single(struct mmc_queue *mq, struct request *req)
 
 			if (!mrq->cmd->error)
 				break;
+
 		}
 
 		if (mrq->cmd->error ||
@@ -2294,7 +2058,7 @@ static void mmc_blk_urgent_bkops(struct mmc_queue *mq,
 				 struct mmc_queue_req *mqrq)
 {
 	if (mmc_blk_urgent_bkops_needed(mq, mqrq))
-		mmc_run_bkops(mq->card);
+		mmc_start_bkops(mq->card, true);
 }
 
 void mmc_blk_mq_complete(struct request *req)
@@ -2324,16 +2088,15 @@ static void mmc_blk_mq_poll_completion(struct mmc_queue *mq,
 	mmc_blk_urgent_bkops(mq, mqrq);
 }
 
-static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq,
-				     struct request_queue *q,
-				     enum mmc_issue_type issue_type)
+static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq, struct request *req)
 {
+	struct request_queue *q = req->q;
 	unsigned long flags;
 	bool put_card;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 
-	mq->in_flight[issue_type] -= 1;
+	mq->in_flight[mmc_issue_type(mq, req)] -= 1;
 
 	put_card = (mmc_tot_in_flight(mq) == 0);
 
@@ -2345,11 +2108,9 @@ static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq,
 
 static void mmc_blk_mq_post_req(struct mmc_queue *mq, struct request *req)
 {
-	enum mmc_issue_type issue_type = mmc_issue_type(mq, req);
 	struct mmc_queue_req *mqrq = req_to_mmc_queue_req(req);
 	struct mmc_request *mrq = &mqrq->brq.mrq;
 	struct mmc_host *host = mq->card->host;
-	struct request_queue *q = req->q;
 
 	mmc_post_req(host, mrq, 0);
 
@@ -2362,7 +2123,7 @@ static void mmc_blk_mq_post_req(struct mmc_queue *mq, struct request *req)
 	else
 		blk_mq_complete_request(req);
 
-	mmc_blk_mq_dec_in_flight(mq, q, issue_type);
+	mmc_blk_mq_dec_in_flight(mq, req);
 }
 
 void mmc_blk_mq_recovery(struct mmc_queue *mq)
@@ -3228,7 +2989,6 @@ static int mmc_dbg_card_status_get(void *data, u64 *val)
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 	req_to_mmc_queue_req(req)->drv_op = MMC_DRV_OP_GET_CARD_STATUS;
-	req_to_mmc_queue_req(req)->drv_op_result = -EIO;
 	blk_execute_rq(mq->queue, NULL, req, 0);
 	ret = req_to_mmc_queue_req(req)->drv_op_result;
 	if (ret >= 0) {
@@ -3267,7 +3027,6 @@ static int mmc_ext_csd_open(struct inode *inode, struct file *filp)
 		goto out_free;
 	}
 	req_to_mmc_queue_req(req)->drv_op = MMC_DRV_OP_GET_EXT_CSD;
-	req_to_mmc_queue_req(req)->drv_op_result = -EIO;
 	req_to_mmc_queue_req(req)->drv_op_data = &ext_csd;
 	blk_execute_rq(mq->queue, NULL, req, 0);
 	err = req_to_mmc_queue_req(req)->drv_op_result;
@@ -3605,3 +3364,4 @@ module_exit(mmc_blk_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Multimedia Card (MMC) block device driver");
+

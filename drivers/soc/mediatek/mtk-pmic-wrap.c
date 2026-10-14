@@ -2529,10 +2529,8 @@ int pwrap_thread_kthread(void *x)
 		pwrap_reenable_pmic_logging();
 		pwrap_monitor_info();
 		pwrap_sw_monitor_clr();
-		#if defined(CONFIG_MTK_AEE_FEATURE)
 		aee_kernel_warning("PWRAP:HW Monitor match",
 				   "PWRAP:HW Monitor match");
-		#endif
 		pwrap_wake_unlock(&pwrapThread_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
@@ -2716,10 +2714,8 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
 					pwrap_writel(wrp, rdata | 0x80000000,
 					PMIF_SPI_PMIF_PMIF_ACC_VIO_INFO_0);
 
-				#if defined(CONFIG_MTK_AEE_FEATURE)
 				aee_kernel_warning("PWRAP:MPU Violation",
 						   "PWRAP:MPU Violation");
-				#endif
 
 			}
 
@@ -2776,10 +2772,8 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
 					pwrap_writel(wrp, rdata | 0x80000000,
 					PMIF_SPI_PMIF_PMIF_ACC_VIO_INFO_0);
 
-				#if defined(CONFIG_MTK_AEE_FEATURE)
 				aee_kernel_warning("PWRAP:MPU Violation",
 						   "PWRAP:MPU Violation");
-				#endif
 
 			} else if ((int3_flg & (0x1 << 27)) != 0) {
 				dev_dbg(wrp->dev, "[PWRAP] HW Monitor match\n");

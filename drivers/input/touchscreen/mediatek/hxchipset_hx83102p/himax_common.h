@@ -75,7 +75,12 @@
 /*=============================================*/
 
 /* Enable it if driver go into suspend/resume twice */
-#undef HX_CONFIG_FB
+/* TB301FU (sjllls): upstream unconditionally undefines HX_CONFIG_FB,
+ * forcing the DRM branch which needs the MTK-internal
+ * linux/msm_drm_notify.h. The stock kernel binary contains no
+ * msm_drm_notifier symbols, so keep the FB branch (CONFIG_FB=y).
+ */
+/* #undef HX_CONFIG_FB */
 
 /* Enable it if driver go into suspend/resume twice */
 /* #undef HX_CONFIG_DRM */

@@ -201,5 +201,5 @@ config TOUCHSCREEN_GOODIX_BRL
 	  If build module, say M.
 	  If unsure, say N.
 source "drivers/input/touchscreen/mediatek/goodix_berlin_driver/Kconfig"
-
+source "drivers/input/touchscreen/mediatek/ft8201m/Kconfig"
 endif

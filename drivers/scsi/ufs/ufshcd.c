@@ -97,9 +97,6 @@
 /* default delay of autosuspend: 2000 ms */
 #define RPM_AUTOSUSPEND_DELAY_MS 2000
 
-/* Default delay of RPM device flush delayed work */
-#define RPM_DEV_FLUSH_RECHECK_WORK_DELAY_MS 5000
-
 /* Default value of wait time before gating device ref clock */
 #define UFSHCD_REF_CLK_GATING_WAIT_US 0xFF /* microsecs */
 
@@ -133,13 +130,8 @@ int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
 	if (!regs)
 		return -ENOMEM;
 
-	for (pos = 0; pos < len; pos += 4) {
-		if (offset == 0 &&
-		    pos >= REG_UIC_ERROR_CODE_PHY_ADAPTER_LAYER &&
-		    pos <= REG_UIC_ERROR_CODE_DME)
-			continue;
+	for (pos = 0; pos < len; pos += 4)
 		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
-	}
 
 	ufshcd_hex_dump(prefix, regs, len);
 	kfree(regs);
@@ -3971,16 +3963,11 @@ static inline void ufshcd_add_delay_before_dme_cmd(struct ufs_hba *hba)
 			min_sleep_time_us =
 				MIN_DELAY_BEFORE_DME_CMDS_US - delta;
 		else
-			min_sleep_time_us = 0; /* no more delay required */
+			return; /* no more delay required */
 	}
 
-	if (min_sleep_time_us > 0) {
-		/* allow sleep for extra 50us if needed */
-		usleep_range(min_sleep_time_us, min_sleep_time_us + 50);
-	}
-
-	/* update the last_dme_cmd_tstamp */
-	hba->last_dme_cmd_tstamp = ktime_get();
+	/* allow sleep for extra 50us if needed */
+	usleep_range(min_sleep_time_us, min_sleep_time_us + 50);
 }
 
 /**
@@ -4138,7 +4125,7 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 		 * Make sure UIC command completion interrupt is disabled before
 		 * issuing UIC command.
 		 */
-		ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
+		wmb();
 		reenable_intr = true;
 	}
 	ret = __ufshcd_send_uic_cmd(hba, cmd, false);
@@ -6092,22 +6079,6 @@ out:
 	up(&hba->eh_sem);
 }
 
-static void ufshcd_rpm_dev_flush_recheck_work(struct work_struct *work)
-{
-	struct ufs_hba *hba = container_of(to_delayed_work(work),
-										struct ufs_hba,
-										rpm_dev_flush_recheck_work);
-
-	/*
-	 * To prevent unnecessary VCC power drain after device finishes
-	 * WriteBooster buffer flush or Auto BKOPs, force runtime resume
-	 * after a certain delay to recheck the threshold by next runtime
-	 * suspend.
-	 */
-	pm_runtime_get_sync(hba->dev);
-	pm_runtime_put_sync(hba->dev);
-}
-
 /**
  * ufshcd_update_uic_error - check and set fatal UIC error flags.
  * @hba: per-adapter instance
@@ -6475,11 +6446,6 @@ static int __ufshcd_issue_tm_cmd(struct ufs_hba *hba,
 		memcpy(treq, hba->utmrdl_base_addr + free_slot, sizeof(*treq));
 
 		ufshcd_add_tm_upiu_trace(hba, task_tag, "tm_complete");
-
-		spin_lock_irqsave(hba->host->host_lock, flags);
-		__clear_bit(free_slot, &hba->outstanding_tasks);
-		spin_unlock_irqrestore(hba->host->host_lock, flags);
-
 	}
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
@@ -8915,10 +8881,10 @@ int ufshcd_check_hibern8_exit(struct ufs_hba *hba)
 	ufshcd_vops_auto_hibern8(hba, false);
 
 	reg = VS_LINK_UP;
-	ret = ufs_mtk_wait_link_state(hba, &reg, 100);
+	ufs_mtk_wait_link_state(hba, &reg, 100);
 
 	/* Device is stuck in H8 state */
-	if (ret || reg != VS_LINK_UP) {
+	if (reg == VS_LINK_HIBERN8) {
 		dev_info(hba->dev, "exit h8 state fail\n");
 		ufshcd_print_host_regs(hba);
 
@@ -9024,24 +8990,14 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 			/* make sure that auto bkops is disabled */
 			ufshcd_disable_auto_bkops(hba);
 		}
-		/*
-		 * If device needs to do BKOPS or TW buffer flush during
-		 * Hibern8, keep device power mode as "active power mode"
-		 * and VCC supply.
-		 * For enter active power mode condtions:
-		 * 1. auto bkops enabled
-		 * 2. tw buffer has content
-		 * 3. req_link_state is HIBERN8 or req_link_state is ACTIVE and AH8 is enabled
-		 */
-		hba->rpm_dev_flush_capable = hba->auto_bkops_enabled;
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_TW)
-		hba->rpm_dev_flush_capable = hba->rpm_dev_flush_capable
-			 || (((req_link_state == UIC_LINK_HIBERN8_STATE)
-					|| ((req_link_state == UIC_LINK_ACTIVE_STATE)
-							&& ufshcd_is_auto_hibern8_enabled(hba)))
-				&& ufstw_need_flush(&hba->ufsf));
-#endif
 	}
+#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_TW)
+		if (ufstw_need_flush(&hba->ufsf)) {
+			ret = -EAGAIN;
+			pm_runtime_mark_last_busy(hba->dev);
+			goto enable_gating;
+		}
+#endif
 
 	/* MTK PATCH */
 	ret = ufshcd_check_hibern8_exit(hba);
@@ -9051,17 +9007,14 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		goto enable_gating;
 	}
 
-	if (req_dev_pwr_mode != hba->curr_dev_pwr_mode) {
-		if ((ufshcd_is_runtime_pm(pm_op) && !hba->auto_bkops_enabled)
-			|| !ufshcd_is_runtime_pm(pm_op)) {
-			/* ensure that bkops is disabled */
-			ufshcd_disable_auto_bkops(hba);
-		}
-		if (!hba->rpm_dev_flush_capable) {
-			ret = ufshcd_set_dev_pwr_mode(hba, req_dev_pwr_mode);
-			if (ret)
-				goto enable_gating;
-		}
+	if ((req_dev_pwr_mode != hba->curr_dev_pwr_mode) &&
+	     ((ufshcd_is_runtime_pm(pm_op) && !hba->auto_bkops_enabled) ||
+	       !ufshcd_is_runtime_pm(pm_op))) {
+		/* ensure that bkops is disabled */
+		ufshcd_disable_auto_bkops(hba);
+		ret = ufshcd_set_dev_pwr_mode(hba, req_dev_pwr_mode);
+		if (ret)
+			goto enable_gating;
 	}
 
 	flush_work(&hba->eeh_work);
@@ -9149,7 +9102,6 @@ enable_gating:
 	if (hba->clk_scaling.is_allowed)
 		ufshcd_resume_clkscaling(hba);
 	hba->clk_gating.is_suspended = false;
-	hba->rpm_dev_flush_capable = false;
 #if defined(CONFIG_SCSI_UFS_FEATURE)
 	ufsf_hpb_resume(&hba->ufsf);
 	ufsf_tw_resume(&hba->ufsf);
@@ -9161,9 +9113,6 @@ enable_gating:
 	ufshcd_release(hba);
 	ufshcd_crypto_resume(hba, pm_op);
 out:
-	if (hba->rpm_dev_flush_capable)
-		schedule_delayed_work(&hba->rpm_dev_flush_recheck_work,
-			msecs_to_jiffies(RPM_DEV_FLUSH_RECHECK_WORK_DELAY_MS));
 	hba->pm_op_in_progress = 0;
 	if (ret)
 		ufshcd_update_evt_hist(hba, UFS_EVT_SUSPEND_ERR, (u32)ret);
@@ -9284,12 +9233,6 @@ static int ufshcd_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	if (hba->clk_scaling.is_allowed)
 		ufshcd_resume_clkscaling(hba);
-
-	if (hba->rpm_dev_flush_capable) {
-		hba->rpm_dev_flush_capable = false;
-		cancel_delayed_work(&hba->rpm_dev_flush_recheck_work);
-	}
-
 #if defined(CONFIG_SCSI_UFS_FEATURE)
 	ufsf_hpb_resume(&hba->ufsf);
 	ufsf_tw_resume(&hba->ufsf);
@@ -9344,13 +9287,11 @@ int ufshcd_system_suspend(struct ufs_hba *hba)
 	if (!hba || !hba->is_powered)
 		return 0;
 
-	cancel_delayed_work_sync(&hba->rpm_dev_flush_recheck_work);
-
-	if ((ufs_get_pm_lvl_to_dev_pwr_mode(hba->spm_lvl) == hba->curr_dev_pwr_mode)
-			&& (ufs_get_pm_lvl_to_link_pwr_state(hba->spm_lvl) == hba->uic_link_state)) {
-		if (pm_runtime_suspended(hba->dev) && !hba->rpm_dev_flush_capable)
-			goto out;
-	}
+	if ((ufs_get_pm_lvl_to_dev_pwr_mode(hba->spm_lvl) ==
+	     hba->curr_dev_pwr_mode) &&
+	    (ufs_get_pm_lvl_to_link_pwr_state(hba->spm_lvl) ==
+	     hba->uic_link_state))
+		goto out;
 
 	if (pm_runtime_suspended(hba->dev)) {
 		/*
@@ -9682,13 +9623,6 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	struct Scsi_Host *host = hba->host;
 	struct device *dev = hba->dev;
 
-	/*
-	 * dev_set_drvdata() must be called before any callbacks are registered
-	 * that use dev_get_drvdata() (frequency scaling, clock scaling, hwmon,
-	 * sysfs).
-	 */
-	dev_set_drvdata(dev, hba);
-
 	if (!mmio_base) {
 		dev_err(hba->dev,
 		"Invalid memory reference for mmio_base is NULL\n");
@@ -9745,7 +9679,6 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	host->max_cmd_len = UFS_CDB_SIZE;
 
 	hba->max_pwr_info.is_valid = false;
-	hba->rpm_dev_flush_capable = false;
 
 	/* Initailize wait queue for task management */
 	init_waitqueue_head(&hba->tm_wq);
@@ -9755,7 +9688,7 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	INIT_WORK(&hba->eh_work, ufshcd_err_handler);
 	INIT_WORK(&hba->eeh_work, ufshcd_exception_event_handler);
 	INIT_WORK(&hba->inv_resp_work, ufshcd_inv_resp_handler);
-	INIT_DELAYED_WORK(&hba->rpm_dev_flush_recheck_work, ufshcd_rpm_dev_flush_recheck_work);
+
 	sema_init(&hba->eh_sem, 1);
 
 	/* Initialize UIC command mutex */
@@ -9785,7 +9718,7 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	 * Make sure that UFS interrupts are disabled and any pending interrupt
 	 * status is cleared before registering UFS interrupt handler.
 	 */
-	ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
+	mb();
 
 	/* IRQ registration */
 	err = devm_request_irq(dev, irq, ufshcd_intr, IRQF_SHARED, UFSHCD, hba);
@@ -9878,6 +9811,5 @@ EXPORT_SYMBOL_GPL(ufshcd_init);
 MODULE_AUTHOR("Santosh Yaragnavi <santosh.sy@samsung.com>");
 MODULE_AUTHOR("Vinayak Holikatti <h.vinayak@samsung.com>");
 MODULE_DESCRIPTION("Generic UFS host controller driver Core");
-MODULE_SOFTDEP("pre: governor_simpleondemand");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(UFSHCD_DRIVER_VERSION);

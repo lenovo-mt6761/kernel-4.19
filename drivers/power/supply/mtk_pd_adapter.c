@@ -43,6 +43,7 @@
 #include <tcpm.h>
 #include "adapter_class.h"
 
+extern void do_charger_detect(bool en);
 
 struct mtk_pd_adapter_info {
 	struct tcpc_device *tcpc;
@@ -52,6 +53,7 @@ struct mtk_pd_adapter_info {
 	const char *adapter_dev_name;
 	bool enable_kpoc_shdn;
 	int pd_type;
+	int rp_state;
 };
 
 //void notify_adapter_event(enum adapter_type type, enum adapter_event evt,
@@ -128,12 +130,33 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 		break;
 	case TCP_NOTIFY_TYPEC_STATE:
 		/* handle No-rp and dual-rp cable */
+		pinfo->rp_state = noti->typec_state.new_state;  
+		pr_info("%s: typec_rp_state = %d, old_state=%d\n",
+				__func__, noti->typec_state.new_state, noti->typec_state.old_state);
 		if (noti->typec_state.old_state == TYPEC_UNATTACHED &&
+				noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
+			pr_info("Type-C SRC plug in\n");
+			do_charger_detect(false);
+		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
+				noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
+			pr_info("Type-C hub: SRC --> SINK\n");
+			do_charger_detect(true);
+		} else if (noti->typec_state.old_state == TYPEC_UNATTACHED &&
 		   (noti->typec_state.new_state == TYPEC_ATTACHED_CUSTOM_SRC ||
+		    noti->typec_state.new_state == TYPEC_ATTACHED_SNK ||
 		    noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
 			pinfo->pd_type = MTK_PD_CONNECT_TYPEC_ONLY_SNK;
 			ret = srcu_notifier_call_chain(&adapter->evt_nh,
 				MTK_PD_CONNECT_TYPEC_ONLY_SNK, NULL);
+			pr_info("Type-C SINK plug in\n");
+			do_charger_detect(true);
+		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SRC ||
+					noti->typec_state.old_state == TYPEC_ATTACHED_SNK ||
+					noti->typec_state.old_state == TYPEC_ATTACHED_NORP_SRC ||
+					noti->typec_state.old_state == TYPEC_ATTACHED_CUSTOM_SRC) &&
+				noti->typec_state.new_state == TYPEC_UNATTACHED) {
+			pr_info("Type-C plug out\n");
+			do_charger_detect(false);
 		} else if ((noti->typec_state.old_state ==
 			TYPEC_ATTACHED_CUSTOM_SRC ||
 			noti->typec_state.old_state == TYPEC_ATTACHED_NORP_SRC)
@@ -146,6 +169,19 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 	case TCP_NOTIFY_WD_STATUS:
 		ret = srcu_notifier_call_chain(&adapter->evt_nh,
 			MTK_TYPEC_WD_STATUS, &noti->wd_status.water_detected);
+		break;
+	case TCP_NOTIFY_HARD_RESET_STATE:
+		if (noti->hreset_state.state == TCP_HRESET_RESULT_DONE ||
+				noti->hreset_state.state == TCP_HRESET_RESULT_FAIL) {
+			pinfo->enable_kpoc_shdn = true;
+			ret = srcu_notifier_call_chain(&adapter->evt_nh,
+					MTK_TYPEC_HRESET_STATUS, &pinfo->enable_kpoc_shdn);
+		} else if (noti->hreset_state.state == TCP_HRESET_SIGNAL_SEND ||
+				noti->hreset_state.state == TCP_HRESET_SIGNAL_RECV) {
+			pinfo->enable_kpoc_shdn = false;
+			ret = srcu_notifier_call_chain(&adapter->evt_nh,
+					MTK_TYPEC_HRESET_STATUS, &pinfo->enable_kpoc_shdn);
+		}
 		break;
 	}
 	return ret;
@@ -169,6 +205,11 @@ static int pd_get_property(struct adapter_device *dev,
 	case PD_TYPE:
 		{
 			return info->pd_type;
+		}
+		break;
+	case TYPEC_RP_STATE:
+		{
+			return info->rp_state;
 		}
 		break;
 	default:
