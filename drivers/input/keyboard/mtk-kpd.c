@@ -67,10 +67,7 @@ struct mtk_keypad {
 static void kpd_keymap_handler(unsigned long data);
 
 static int kpd_pdrv_probe(struct platform_device *pdev);
-static struct platform_driver kpd_pdrv;
-#define DRIVER_ATTR(_name, _mode, _show, _store) \
-           struct driver_attribute driver_attr_##_name = \
-           __ATTR(_name, _mode, _show, _store)
+
 static void kpd_get_keymap_state(void __iomem *kp_base, u16 state[])
 {
 	state[0] = readw(kp_base + KP_MEM1);
@@ -81,111 +78,6 @@ static void kpd_get_keymap_state(void __iomem *kp_base, u16 state[])
 	pr_debug("kpd register = %x %x %x %x %x\n",
 		state[0], state[1], state[2], state[3], state[4]);
 }
-
-extern unsigned int yk_stop_percent;
-static ssize_t kpd_store_stop_charging_percent(struct device_driver *ddri,
-			   const char *buf, size_t count)
-{
-	int ret;
-	ret = kstrtouint(buf, 0, &yk_stop_percent);
-	if (ret) {
-		pr_info("kpd yk_stop_percent: Invalid values\n");
-		return -EINVAL;
-	}
-	return count;
-}
-static ssize_t kpd_show_stop_charging_percent(struct device_driver *ddri, char *buf)
-{
-	ssize_t res;
-	res = snprintf(buf, PAGE_SIZE, "%d\n", yk_stop_percent);
-	return res;
-}
-static DRIVER_ATTR(stop_charging_percent, 0644, kpd_show_stop_charging_percent,
-			   kpd_store_stop_charging_percent);
-
-#if 1// defined(TOUCHPANEL_GESTURE) //xen 20170831 by tp gesture controller by MMI
-struct input_dev *kpd_input_dev;
-int gesture_open_state = 0;
-static ssize_t kpd_store_tp_gesture_state(struct device_driver *ddri, const char *buf, size_t count)
-{
-	if(strncmp("yes",buf,3)==0){
-		gesture_open_state = 1;
-		pr_info("[TP_GESTURE] tp_sysfs_tpgesturet_store on.\n");
-	}
-	else if(strncmp("no",buf,2)==0){
-		gesture_open_state = 0;
-		pr_info("[TP_GESTURE] tp_sysfs_tpgesturet_store off.\n");
-	}
-
-	return count;
-}
-
-static ssize_t kpd_show_tp_gesture_state(struct device_driver *ddri, char *buf)
-{
-	ssize_t res;
-
-	res = snprintf(buf, PAGE_SIZE, "%d\n", gesture_open_state);
-	return res;
-}
-
-static DRIVER_ATTR(kpd_tp_gesture_state, S_IWUSR | S_IRUGO, kpd_show_tp_gesture_state, kpd_store_tp_gesture_state);
-#endif
-static struct driver_attribute *kpd_attr_list[] = {
-	&driver_attr_stop_charging_percent,
-#if  1// defined(TOUCHPANEL_GESTURE) //xen 20170831 by tp gesture controller by MMI
-	&driver_attr_kpd_tp_gesture_state,
-#endif
-
-};
-
-static int kpd_create_attr(struct device_driver *driver)
-{
-	int idx, err = 0;
-	int num = ARRAY_SIZE(kpd_attr_list);
-
-	if (driver == NULL)
-		return -EINVAL;
-
-	for (idx = 0; idx < num; idx++) {
-		err = driver_create_file(driver, kpd_attr_list[idx]);
-		if (err) {
-			pr_info("driver_create_file (%s) = %d\n",
-				kpd_attr_list[idx]->attr.name, err);
-			break;
-		}
-	}
-	return err;
-}
-
-static int kpd_delete_attr(struct device_driver *driver)
-{
-	int idx, err = 0;
-	int num = ARRAY_SIZE(kpd_attr_list);
-
-	if (!driver)
-		return -EINVAL;
-
-	for (idx = 0; idx < num; idx++)
-		driver_remove_file(driver, kpd_attr_list[idx]);
-
-	return err;
-}
-//add end ybx
-
-#if 1// defined (TOUCHPANEL_GESTURE)  // xjl 2014-01-16
-void kpd_touchpanel_gesture_handler(int key_code)
-{
-	//for vibrate soon
-	//upmu_set_rg_vibr_en(1); //xjl 20140526
-	//mdelay(50);
-	//upmu_set_rg_vibr_en(0);
-
-	input_report_key(kpd_input_dev, key_code, 1);
-	input_sync(kpd_input_dev);
-	input_report_key(kpd_input_dev, key_code, 0);
-	input_sync(kpd_input_dev);
-}
-#endif
 
 static void kpd_keymap_handler(unsigned long data)
 {
@@ -384,26 +276,6 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 				keypad->input_dev->keybit);
 	}
 
-#if 1//defined (TOUCHPANEL_GESTURE)  // xjl 2014-01-16
-        kpd_input_dev = keypad->input_dev;
-	__set_bit(KEY_TPGESTURE_UP, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_DOWN, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_LEFT, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_RIGHT, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_DOUBLE, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_C, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_E, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_M, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_O, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_S, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_V, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_W, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_Z, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_ARROWUP, keypad->input_dev->keybit);
-	__set_bit(KEY_TPGESTURE_ARROWRIGHT, keypad->input_dev->keybit);
-        __set_bit(KEY_F4, keypad->input_dev->keybit);//tplink
-#endif
-
 	err = input_register_device(keypad->input_dev);
 	if (err) {
 		pr_notice("register input device failed (%d)\n", err);
@@ -433,13 +305,6 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 	}
 
 	pr_info("kpd_probe OK.\n");
-	
-	err = kpd_create_attr(&kpd_pdrv.driver);
-	if (err) {
-		pr_notice("create attr file fail\n");
-		kpd_delete_attr(&kpd_pdrv.driver);
-		return err;
-	}
 
 	return 0;
 
