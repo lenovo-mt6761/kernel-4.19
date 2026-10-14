@@ -6,6 +6,11 @@
 #include "cam_cal_list.h"
 #include "eeprom_i2c_common_driver.h"
 #include "eeprom_i2c_custom_driver.h"
+#include "eeprom_i2c_gc02m1_driver.h"
+#include "eeprom_i2c_gc08a3_driver.h"
+#include "eeprom_i2c_lycni_sc501cs_driver.h"
+#include "eeprom_i2c_txdii_sc501cs_driver.h"
+#include "eeprom_i2c_sc202cs_driver.h"
 #include "kd_imgsensor.h"
 
 struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
@@ -51,6 +56,13 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{HI556_SENSOR_ID, 0x51, Common_read_region},
 	{S5K5E8YX_SENSOR_ID, 0x5a, Common_read_region},
 	{S5K5E8YXREAR2_SENSOR_ID, 0x5a, Common_read_region},
+	{GC02M1_SENSOR_ID, 0x6E, gc02m1_read_region},
+	{GC08A3_SENSOR_ID, 0x62, gc08a3_read_region},
+	{SC501CS_5M_LYCN_I_SENSOR_ID, 0x20, sc501cs_lycni_read_region},
+	{SC501CS_5M_TXD_II_SENSOR_ID, 0x20, sc501cs_txdii_read_region},
+	{SC202CS_SENSOR_ID , 0x20, sc202_read_region},
+
+
 	/*  ADD before this line */
 	{0, 0, 0}       /*end of list */
 };

@@ -40,7 +40,7 @@ extern int gM4U_log_to_uart;
 	do {\
 		if (level > gM4U_log_level) {\
 			if (level > gM4U_log_to_uart)\
-				pr_debug("[M4U] "string, ##args);\
+				pr_info("[M4U] "string, ##args);\
 			else\
 				pr_debug("[M4U] "string, ##args);\
 		} \
@@ -90,7 +90,7 @@ extern int gM4U_log_to_uart;
 		if (seq_file)\
 			seq_printf(seq_file, fmt, ##args);\
 		else\
-			pr_debug(fmt, ##args);\
+			pr_info(fmt, ##args);\
 	}
 
 #if (defined(CONFIG_TRUSTONIC_TEE_SUPPORT) || \

@@ -80,13 +80,6 @@
 #define SMC_ARCH_EXTENSION	".arch_extension sec\n"
 #define SMC_REGISTERS_TRASHED	"ip"
 #endif
-
-#define DYNAMIC_SET_PRIORITY
-#define TRUSTY_RT_POLICY         (0x1)
-#define TRUSTY_NORMAL_POLICY     (0X2)
-#define NUM_THREADS   8
-static struct task_struct *ts[NUM_THREADS];
-
 static inline ulong smc_asm(ulong r0, ulong r1, ulong r2, ulong r3)
 {
 	register ulong _r0 asm(SMC_ARG0) = r0;
@@ -768,9 +761,9 @@ static int trusty_nop_thread_free(struct trusty_state *s)
 
 	for_each_possible_cpu(cpu) {
 		struct nop_task_info *nop_ti = per_cpu_ptr(s->nop_tasks_info, cpu);
-		ts[cpu] = per_cpu_ptr(s->nop_tasks_fd, cpu);
+		struct task_struct *ts = per_cpu_ptr(s->nop_tasks_fd, cpu);
 
-		if (IS_ERR_OR_NULL(nop_ti) || IS_ERR_OR_NULL(ts[cpu]))
+		if (IS_ERR_OR_NULL(nop_ti) || IS_ERR_OR_NULL(ts))
 			continue;
 
 		nop_ti->idx = -1;
@@ -800,8 +793,8 @@ static int trusty_nop_thread_create(struct trusty_state *s)
 	}
 
 	for_each_possible_cpu(cpu) {
+		struct task_struct *ts = per_cpu_ptr(s->nop_tasks_fd, cpu);
 		struct nop_task_info *nop_ti = per_cpu_ptr(s->nop_tasks_info, cpu);
-		ts[cpu] = per_cpu_ptr(s->nop_tasks_fd, cpu);
 
 		nop_ti->idx = cpu;
 		nop_ti->ts = s;
@@ -814,17 +807,18 @@ static int trusty_nop_thread_create(struct trusty_state *s)
 		init_completion(&nop_ti->rdy);
 		INIT_LIST_HEAD(&nop_ti->nop_queue);
 
-		ts[cpu] = kthread_create_on_node(trusty_task_nop, (void *)nop_ti,
+		ts = kthread_create_on_node(trusty_task_nop, (void *)nop_ti,
 					    cpu_to_node(cpu), "id%d_trusty_n/%d",
 					    s->tee_id, cpu);
-		if (IS_ERR(ts[cpu])) {
+		if (IS_ERR(ts)) {
 			trusty_info(s->dev, "%s unable create kthread\n", __func__);
-			ret = PTR_ERR(ts[cpu]);
+			ret = PTR_ERR(ts);
 			goto err_thread_create;
 		}
-		kthread_bind(ts[cpu], cpu);
+		set_user_nice(ts, PRIO_TO_NICE(MAX_USER_RT_PRIO) + 1);
+		kthread_bind(ts, cpu);
 
-		wake_up_process(ts[cpu]);
+		wake_up_process(ts);
 	}
 
 	for_each_possible_cpu(cpu) {
@@ -842,42 +836,6 @@ err_thread_create:
 	trusty_nop_thread_free(s);
 	return ret;
 }
-
-int trusty_nop_set_switch_pri(uint32_t policy)
-{
-	#ifdef DYNAMIC_SET_PRIORITY
-	struct sched_param param = {.sched_priority = 50 };
-	int retVal = 0;
-	unsigned int cpu;
-
-	if (policy == TRUSTY_RT_POLICY) {
-		for_each_possible_cpu(cpu) {
-			if (ts[cpu] != NULL) {
-				sched_setscheduler_nocheck(ts[cpu],
-						SCHED_FIFO, &param);
-			} else
-				return -EINVAL;
-		}
-		return 0;
-	} else if (policy == TRUSTY_NORMAL_POLICY) {
-		param.sched_priority = 0;
-		for_each_possible_cpu(cpu) {
-			if (ts[cpu] != NULL) {
-				sched_setscheduler_nocheck(ts[cpu],
-						SCHED_NORMAL, &param);
-				set_user_nice(ts[cpu], PRIO_TO_NICE(MAX_RT_PRIO) + 1);
-			} else
-				return -EINVAL;
-		}
-		return 0;
-	}
-
-	return retVal;
-	#else
-		return 0;
-	#endif
-}
-EXPORT_SYMBOL_GPL(trusty_nop_set_switch_pri);
 
 static int trusty_poll_notify(struct notifier_block *nb, unsigned long action,
 		       void *data)

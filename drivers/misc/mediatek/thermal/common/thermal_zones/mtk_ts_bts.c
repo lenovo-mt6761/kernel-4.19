@@ -37,13 +37,13 @@
 int __attribute__ ((weak))
 IMM_IsAdcInitReady(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 int __attribute__ ((weak))
 IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 
@@ -99,7 +99,7 @@ int bts_cur_temp = 1;
 #define mtkts_bts_dprintk(fmt, args...)   \
 do {                                    \
 	if (mtkts_bts_debug_log) {                \
-		pr_debug("[Thermal/TZ/BTS]" fmt, ##args); \
+		pr_notice("[Thermal/TZ/BTS]" fmt, ##args); \
 	}                                   \
 } while (0)
 
@@ -137,11 +137,11 @@ struct BTS_TEMPERATURE {
 	__s32 TemperatureR;
 };
 
-static int g_RAP_pull_up_R = BTS_RAP_PULL_UP_R;
-static int g_TAP_over_critical_low = BTS_TAP_OVER_CRITICAL_LOW;
-static int g_RAP_pull_up_voltage = BTS_RAP_PULL_UP_VOLTAGE;
-static int g_RAP_ntc_table = BTS_RAP_NTC_TABLE;
-static int g_RAP_ADC_channel = BTS_RAP_ADC_CHANNEL;
+static int g_RAP_pull_up_R = BTSNRPA_RAP_PULL_UP_R;
+static int g_TAP_over_critical_low = BTSNRPA_TAP_OVER_CRITICAL_LOW;
+static int g_RAP_pull_up_voltage = BTSNRPA_RAP_PULL_UP_VOLTAGE;
+static int g_RAP_ntc_table = BTSNRPA_RAP_NTC_TABLE;
+static int g_RAP_ADC_channel = BTSNRPA_RAP_ADC_CHANNEL;
 static int g_AP_TemperatureR;
 /* BTS_TEMPERATURE BTS_Temperature_Table[] = {0}; */
 
@@ -703,7 +703,7 @@ int mtkts_bts_get_hw_temp(void)
 		t_ret2 = wakeup_ta_algo(TA_CATMPLUS_TTJ);
 
 	if (t_ret2 < 0)
-		pr_debug("[Thermal/TZ/BTS]wakeup_ta_algo out of memory\n");
+		pr_notice("[Thermal/TZ/BTS]wakeup_ta_algo out of memory\n");
 
 	bts_cur_temp = t_ret;
 
@@ -1121,7 +1121,7 @@ void mtkts_bts_prepare_table(int table_num)
 		break;
 	}
 
-	pr_debug("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
+	pr_notice("[Thermal/TZ/BTS] %s table_num=%d\n", __func__, table_num);
 
 }
 

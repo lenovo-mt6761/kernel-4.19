@@ -660,8 +660,8 @@
 /* USB-IF SVIDs */
 #define USB_SID_PD		0xff00	/* power delivery */
 #define USB_SID_DISPLAYPORT	0xff01	/* display port */
-#define USB_VID_RICHTEK		0x29cf  /* demo uvdm */
-#define USB_VID_DIRECTCHARGE	0x29cf  /* direct charge */
+#define USB_VID_RICHTEK		0x6dcf  /* demo uvdm */
+#define USB_VID_DIRECTCHARGE	0x6dcf  /* direct charge */
 #define USB_VID_MQP		0x1748
 
 /* PD counter definitions */

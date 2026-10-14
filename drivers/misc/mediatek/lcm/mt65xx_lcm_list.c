@@ -1187,10 +1187,6 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 	&ili9881c_hd_dsi_vdo_ilitek_nt50358_lcm_drv,
 #endif
 
-#if defined(ILI9882N_HDP_DSI_VDO_RT4801_90HZ)
-	&ili9882n_hdp_dsi_vdo_rt4801_90hz_lcm_drv,
-#endif
-
 #if defined(HX83112B_FHDP_DSI_CMD_AUO_RT4801)
 	&hx83112b_fhdp_dsi_cmd_auo_rt4801_lcm_drv,
 #endif
@@ -1201,6 +1197,10 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 
 #if defined(FT8201_WXGA_VDO_INCELL_BOE)
 	&ft8201_wxga_vdo_incell_boe_lcm_drv,
+#endif
+
+#if defined(FT8201M_WXGA_VDO_INCELL_BOE)
+	&ft8201m_wxga_vdo_incell_boe_lcm_drv,
 #endif
 
 #if defined(NT51021H_WUXGA_VDO_ONCELL_BOE)
@@ -1294,18 +1294,6 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 
 #if defined(KD070FHFID015_DSI_1200X1920)
 	&kd070fhfid015_dsi_1200x1920_lcm_drv,
-#endif
-
-#if defined(ICNL9911SAC_6735_DSI_YK6XX)
-        &icnl9911sac_6735_dsi_lcm_drv_yk6xx,
-#endif
-
-#if defined(ILI9881D_6735_DSI_YK6XX)
-        &ili9881d_6735_dsi_lcm_drv_yk6xx,
-#endif
-
-#if defined(ILI9882_6735_DSI_YK6XX)
-        &ili9882_6735_dsi_lcm_drv_yk6xx,
 #endif
 };
 

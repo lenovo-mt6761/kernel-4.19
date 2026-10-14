@@ -6,7 +6,7 @@
 #ifndef _SENSOR_LIST_H
 #define _SENSOR_LIST_H
 
-#ifndef CONFIG_CUSTOM_KERNEL_SENSORHUB
+#if 1//ndef CONFIG_CUSTOM_KERNEL_SENSORHUB
 struct sensorInfo_NonHub_t {
 	char name[16];
 };

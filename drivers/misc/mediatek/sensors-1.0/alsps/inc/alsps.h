@@ -60,6 +60,7 @@ struct als_control_path {
 		int64_t maxBatchReportLatencyNs);
 	int (*flush)(void);	    /* open data rerport to HAL */
 	int (*set_cali)(uint8_t *data, uint8_t count);
+	int (*set_offset)(uint8_t *data, uint8_t count);
 	int (*rgbw_enable)(int en);
 	int (*rgbw_batch)(int flag, int64_t samplingPeriodNs,
 		int64_t maxBatchReportLatencyNs);
@@ -181,10 +182,11 @@ extern int alsps_aal_get_data(void);
 extern int alsps_driver_add(struct alsps_init_info *obj);
 extern int ps_report_interrupt_data(int value);
 extern int ps_flush_report(void);
-extern int als_data_report(int value, int status);
-extern int als_data_report_t(int value, int status, int64_t time_stamp);
+extern int als_data_report(int* value, int status);
+extern int als_data_report_t(int* value, int status, int64_t time_stamp);
 extern int ps_cali_report(int *value);
 extern int als_cali_report(int *value);
+extern int als_offset_report(int32_t value[2]);
 extern int als_flush_report(void);
 extern int rgbw_data_report(int value[4]);
 extern int rgbw_data_report_t(int value[4], int64_t time_stamp);

@@ -4,6 +4,16 @@
  * Copyright (c) 2020 MediaTek Inc.
  */
 
+/*
+ * TB301FU (sjllls): when the WLAN driver is built into the kernel
+ * (CONFIG_WLAN_DRV_BUILD_IN=y), the TRACE_EVENT below registers into
+ * vmlinux ftrace_events and panics the tracefs instance creation path
+ * at boot (~31s, __trace_add_new_event -> event_create_dir) - the same
+ * bug class as the BT driver's TRACE_EVENT(bt_evt). Neutralize the
+ * tracepoint for built-in builds; keep it for module builds (stock).
+ */
+#ifndef CONFIG_WLAN_DRV_BUILD_IN
+
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM mtk_wifi_trace
 
@@ -39,3 +49,14 @@ TRACE_EVENT(wifi_standalone_log,
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE mtk_wifi_trace
 #include <trace/define_trace.h>
+
+#else /* CONFIG_WLAN_DRV_BUILD_IN */
+
+#define WIFI_LOG_MSG_MAX (512)
+
+static inline void trace_wifi_standalone_log(const char *str)
+{
+	(void)str;
+}
+
+#endif /* CONFIG_WLAN_DRV_BUILD_IN */

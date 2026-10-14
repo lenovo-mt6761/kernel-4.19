@@ -102,6 +102,7 @@ struct compat_biometric_threshold {
 #define ALSPS_SET_PS_MODE _IOW(ALSPS, 0x01, int)
 #define ALSPS_GET_PS_RAW_DATA _IOR(ALSPS, 0x04, int)
 #define ALSPS_SET_ALS_MODE _IOW(ALSPS, 0x05, int)
+#define ALSPS_GET_ALS_DATA _IOR(ALSPS, 0x07, int)
 #define ALSPS_GET_ALS_RAW_DATA _IOR(ALSPS, 0x08, int)
 
 /*-------------------MTK add-------------------------------------------*/
@@ -119,7 +120,10 @@ struct compat_biometric_threshold {
 #define ALSPS_PS_ENABLE_CALI _IO(ALSPS, 0x18)
 #define ALSPS_IOCTL_ALS_GET_CALI _IOW(ALSPS, 0x19, int)
 #define ALSPS_ALS_SET_CALI _IOW(ALSPS, 0x20, int)
-
+#define ALSPS_ALS_SET_OFFSET _IOW(ALSPS, 0x21, int)
+#define ALSPS_ALS_GET_OFFSET _IOR(ALSPS, 0x22, int)
+#define ALSPS_ALS_CLR_OFFSET _IOW(ALSPS, 0x23, int)
+#define ALSPS_ALS_IOCTL_CLR_CALI _IOW(ALSPS, 0x24, int)
 #ifdef CONFIG_COMPAT
 #define COMPAT_ALSPS_SET_PS_MODE _IOW(ALSPS, 0x01, compat_int_t)
 #define COMPAT_ALSPS_GET_PS_RAW_DATA _IOR(ALSPS, 0x04, compat_int_t)

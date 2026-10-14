@@ -388,6 +388,11 @@ static int mtk_extcon_tcpc_notifier(struct notifier_block *nb,
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
 			dev_info(dev, "Type-C SRC plug in\n");
 			mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_HOST);
+		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
+				noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
+			dev_info(dev, "Type-C hub: SRC --> SINK\n");
+			mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_NONE);
+			mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_HOST);
 		} else if (!(extcon->bypss_typec_sink) &&
 			noti->typec_state.old_state == TYPEC_UNATTACHED &&
 			(noti->typec_state.new_state == TYPEC_ATTACHED_SNK ||
@@ -450,8 +455,7 @@ static int mtk_usb_extcon_tcpc_init(struct mtk_extcon_info *extcon)
 	return 0;
 }
 #endif
-void eta6937_set_otg_enable(void);
-void eta6937_set_otg_disable(void);
+
 static void mtk_usb_extcon_detect_cable(struct work_struct *work)
 {
 	struct mtk_extcon_info *extcon = container_of(to_delayed_work(work),
@@ -465,12 +469,9 @@ static void mtk_usb_extcon_detect_cable(struct work_struct *work)
 
 	/* at first we clean states which are no longer active */
 	if (id) {
-		eta6937_set_otg_disable();
 		mtk_usb_extcon_set_vbus(extcon, false);
 		mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_NONE);
 	} else {
-		printk("host otg%s",__func__);
-		eta6937_set_otg_enable();
 		mtk_usb_extcon_set_vbus(extcon, true);
 		mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_HOST);
 	}
@@ -481,7 +482,7 @@ static irqreturn_t mtk_usb_idpin_handle(int irq, void *dev_id)
 	struct mtk_extcon_info *extcon = dev_id;
 
 	/* issue detection work */
-	queue_delayed_work(system_power_efficient_wq, &extcon->wq_detcable, 200);
+	queue_delayed_work(system_power_efficient_wq, &extcon->wq_detcable, 0);
 
 	return IRQ_HANDLED;
 }
@@ -525,7 +526,6 @@ static int mtk_usb_extcon_id_pin_init(struct mtk_extcon_info *extcon)
 	dev_info(extcon->dev, "id value : %d\n", id);
 	if (!id) {
 		mtk_usb_extcon_set_vbus(extcon, true);
-			eta6937_set_otg_enable();
 		mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_HOST);
 	}
 
@@ -636,7 +636,6 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 		return PTR_ERR(extcon->vbus);
 	}
 
-#ifndef CONFIG_CHRDET_VBUS_DETECTION
 	if (!of_property_read_u32(dev->of_node, "vbus-voltage",
 					&extcon->vbus_vol))
 		dev_info(dev, "vbus-voltage=%d", extcon->vbus_vol);
@@ -644,7 +643,6 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	if (!of_property_read_u32(dev->of_node, "vbus-current",
 					&extcon->vbus_cur))
 		dev_info(dev, "vbus-current=%d", extcon->vbus_cur);
-#endif
 
 	extcon->bypss_typec_sink =
 		of_property_read_bool(dev->of_node,

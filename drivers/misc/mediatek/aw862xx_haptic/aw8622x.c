@@ -4727,7 +4727,7 @@ static int aw8622x_tiktap_i2c_writes(struct aw8622x *aw8622x,
 	return ret;
 }
 
-static inline unsigned int aw8622x_get_sys_msecs(void)
+static inline unsigned int aw8622x_get_sys_msecs()
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 	struct timespec64 ts64;

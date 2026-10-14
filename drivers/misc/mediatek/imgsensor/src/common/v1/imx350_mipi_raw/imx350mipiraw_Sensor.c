@@ -41,21 +41,17 @@
 #include "imx350_eeprom.h"
 #include "imx350mipiraw_Sensor.h"
 
-#if IS_ENABLED(CONFIG_CM_CUST_GPIOS_SUPPORT) //Leo 20230131
-#include <mt-plat/cust_gpios.h>
-#endif
-
 /************************Modify Following Strings for Debug********************/
 #define PFX "IMX350_camera_sensor"
 #define LOG_1 LOG_INF("IMX350,MIPI 4LANE\n")
+#define LOG_2 LOG_INF(\
+	"preview 2592*1936@30fps; video 5344*4016@30fps; capture 21M@24fps\n")
 /************************   Modify end    *************************************/
 
 #undef IMX350_24_FPS
 
-#define LOG_INF(format, args...) pr_debug(PFX "[%s] " format, __func__, ##args)
-
-#define H_FOV 63
-#define V_FOV 49
+#define LOG_INF(format, args...) \
+	pr_debug(PFX "[%s] " format, __func__, ##args)
 
 /*******************************************************************************
  * Proifling
@@ -83,7 +79,8 @@ static void KD_SENSOR_PROFILE(char *tag)
 
 	do_gettimeofday(&tv2);
 	TimeIntervalUS =
-	  (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+		(tv2.tv_sec - tv1.tv_sec) * 1000000 +
+		(tv2.tv_usec - tv1.tv_usec);
 	tv1 = tv2;
 
 	spin_unlock(&kdsensor_drv_lock);
@@ -112,10 +109,13 @@ static DEFINE_SPINLOCK(imgsensor_drv_lock);
 static BYTE imx350_SPC_data[352] = { 0 };
 
 static struct imgsensor_info_struct imgsensor_info = {
+	/* record sensor id defined in Kd_imgsensor.h */
 	.sensor_id = IMX350_SENSOR_ID,
+	/* checksum value for Camera Auto Test */
 	.checksum_value = 0xD1EFF68B,
+
 	.pre = {		/*data rate 1099.20 Mbps/lane */
-		.pclk = 420000000,	/* record different mode's pclk */
+		.pclk = 531000000,	/* record different mode's pclk */
 		.linelength = 6648,	/* record different mode's linelength */
 		.framelength = 2104, /* record different mode's framelength */
 		.startx = 0, /* record different mode's startx of grabwindow */
@@ -185,13 +185,8 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.mipi_pixel_rate = 201600000,
 		.max_framerate = 1200,
 	},
-	.margin = 18,		/* sensor framelength & shutter margin */
-	.min_shutter = 8,	/* min shutter */
-	.min_gain = 64, /*1x gain*/
-	.max_gain = 1024, /*16x gain*/
-	.min_gain_iso = 100,
-	.gain_step = 1,
-	.gain_type = 0,
+	.margin = 10,		/* sensor framelength & shutter margin */
+	.min_shutter = 1,	/* min shutter */
 
 	/* max framelength by sensor register's limitation */
 	.max_frame_length = 0xffff,
@@ -209,7 +204,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.ihdr_le_firstline = 0,	/* 1,le first ; 0, se first */
 	.temperature_support = 1,	/* 1, support; 0,not support */
 	.sensor_mode_num = 4,	/* support sensor mode num */
-	.frame_time_delay_frame = 3,
+
 	.cap_delay_frame = 1,	/* enter capture delay frame num */
 	.pre_delay_frame = 2,	/* enter preview delay frame num */
 	.video_delay_frame = 1,	/* enter video delay frame num */
@@ -257,17 +252,17 @@ static struct imgsensor_struct imgsensor = {
 
 /* Sensor output window information */
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[10] = {
-	{5184, 3880, 0, 0, 5184, 3872, 2592, 1936,
+	{5184, 3880, 0, 0, 5184, 3880, 2592, 1936,
 	0000, 0000, 2592, 1936, 0, 0, 2592, 1936},	/* Preview */
 	{5184, 3880, 0, 0, 5184, 3880, 5184, 3880,
 	0000, 0000, 5184, 3880, 0, 0, 5184, 3880},	/* capture */
-	{5184, 3880, 0, 480, 5184, 2916, 5184, 2916,
+	{5184, 3880, 0, 480, 5184, 3880, 5184, 2916,
 	0000, 0000, 5184, 2916, 0, 0, 5184, 2916},	/* video */
-	{5184, 3880, 672, 856, 3840, 2160, 1280, 720,
-	00, 0000, 1280, 720, 0, 0, 1280, 720},
+	{5184, 3880, 0, 848, 5184, 3880, 1336, 736,
+	20, 0000, 1296, 736, 0, 0, 1280, 720},
 };
 
-/*VC1 for HDR(DT=0X35), VC2 for PDAF(DT=0X36), unit : 10bit */
+/*VC1 for HDR(DT=0X35) , VC2 for PDAF(DT=0X36), unit : 10bit */
 static struct SENSOR_VC_INFO_STRUCT SENSOR_VC_INFO[3] = {
 	/* Preview mode setting */
 	{0x01, 0x0a, 0x00, 0x08, 0x40, 0x00,
@@ -675,969 +670,6 @@ kal_uint16 imx350MIPI_sensorGainMapping[IMX350MIPI_MaxGainIndex][2] = {
 	{1008, 959},
 	{1024, 960},
 };
-static kal_uint32 ana_gain_table_16x[] = {
-	100000,
-	100098,
-	100196,
-	100294,
-	100392,
-	100491,
-	100589,
-	100688,
-	100787,
-	100887,
-	100986,
-	101086,
-	101186,
-	101286,
-	101386,
-	101487,
-	101587,
-	101688,
-	101789,
-	101891,
-	101992,
-	102094,
-	102196,
-	102298,
-	102400,
-	102503,
-	102605,
-	102708,
-	102811,
-	102915,
-	103018,
-	103122,
-	103226,
-	103330,
-	103434,
-	103539,
-	103644,
-	103749,
-	103854,
-	103959,
-	104065,
-	104171,
-	104277,
-	104383,
-	104490,
-	104597,
-	104703,
-	104811,
-	104918,
-	105026,
-	105133,
-	105242,
-	105350,
-	105458,
-	105567,
-	105676,
-	105785,
-	105895,
-	106004,
-	106114,
-	106224,
-	106334,
-	106445,
-	106556,
-	106667,
-	106778,
-	106889,
-	107001,
-	107113,
-	107225,
-	107338,
-	107450,
-	107563,
-	107676,
-	107789,
-	107903,
-	108017,
-	108131,
-	108245,
-	108360,
-	108475,
-	108590,
-	108705,
-	108820,
-	108936,
-	109052,
-	109168,
-	109285,
-	109402,
-	109519,
-	109636,
-	109753,
-	109871,
-	109989,
-	110108,
-	110226,
-	110345,
-	110464,
-	110583,
-	110703,
-	110823,
-	110943,
-	111063,
-	111183,
-	111304,
-	111425,
-	111547,
-	111668,
-	111790,
-	111913,
-	112035,
-	112158,
-	112281,
-	112404,
-	112527,
-	112651,
-	112775,
-	112900,
-	113024,
-	113149,
-	113274,
-	113400,
-	113525,
-	113651,
-	113778,
-	113904,
-	114031,
-	114158,
-	114286,
-	114413,
-	114541,
-	114670,
-	114798,
-	114927,
-	115056,
-	115186,
-	115315,
-	115445,
-	115576,
-	115706,
-	115837,
-	115968,
-	116100,
-	116232,
-	116364,
-	116496,
-	116629,
-	116762,
-	116895,
-	117029,
-	117162,
-	117297,
-	117431,
-	117566,
-	117701,
-	117837,
-	117972,
-	118108,
-	118245,
-	118382,
-	118519,
-	118656,
-	118794,
-	118931,
-	119070,
-	119208,
-	119347,
-	119487,
-	119626,
-	119766,
-	119906,
-	120047,
-	120188,
-	120329,
-	120471,
-	120612,
-	120755,
-	120897,
-	121040,
-	121183,
-	121327,
-	121471,
-	121615,
-	121760,
-	121905,
-	122050,
-	122196,
-	122342,
-	122488,
-	122635,
-	122782,
-	122929,
-	123077,
-	123225,
-	123373,
-	123522,
-	123671,
-	123821,
-	123971,
-	124121,
-	124272,
-	124423,
-	124574,
-	124726,
-	124878,
-	125031,
-	125183,
-	125337,
-	125490,
-	125644,
-	125799,
-	125953,
-	126108,
-	126264,
-	126420,
-	126576,
-	126733,
-	126890,
-	127047,
-	127205,
-	127363,
-	127522,
-	127681,
-	127840,
-	128000,
-	128160,
-	128321,
-	128482,
-	128643,
-	128805,
-	128967,
-	129130,
-	129293,
-	129456,
-	129620,
-	129785,
-	129949,
-	130114,
-	130280,
-	130446,
-	130612,
-	130779,
-	130946,
-	131114,
-	131282,
-	131451,
-	131620,
-	131789,
-	131959,
-	132129,
-	132300,
-	132471,
-	132642,
-	132815,
-	132987,
-	133160,
-	133333,
-	133507,
-	133681,
-	133856,
-	134031,
-	134207,
-	134383,
-	134560,
-	134737,
-	134914,
-	135092,
-	135271,
-	135450,
-	135629,
-	135809,
-	135989,
-	136170,
-	136352,
-	136533,
-	136716,
-	136898,
-	137082,
-	137265,
-	137450,
-	137634,
-	137820,
-	138005,
-	138192,
-	138378,
-	138566,
-	138753,
-	138942,
-	139130,
-	139320,
-	139510,
-	139700,
-	139891,
-	140082,
-	140274,
-	140466,
-	140659,
-	140853,
-	141047,
-	141241,
-	141436,
-	141632,
-	141828,
-	142025,
-	142222,
-	142420,
-	142618,
-	142817,
-	143017,
-	143217,
-	143417,
-	143619,
-	143820,
-	144023,
-	144225,
-	144429,
-	144633,
-	144837,
-	145042,
-	145248,
-	145455,
-	145661,
-	145869,
-	146077,
-	146286,
-	146495,
-	146705,
-	146915,
-	147126,
-	147338,
-	147550,
-	147763,
-	147977,
-	148191,
-	148406,
-	148621,
-	148837,
-	149054,
-	149271,
-	149489,
-	149708,
-	149927,
-	150147,
-	150367,
-	150588,
-	150810,
-	151032,
-	151256,
-	151479,
-	151704,
-	151929,
-	152155,
-	152381,
-	152608,
-	152836,
-	153064,
-	153293,
-	153523,
-	153754,
-	153985,
-	154217,
-	154449,
-	154683,
-	154917,
-	155152,
-	155387,
-	155623,
-	155860,
-	156098,
-	156336,
-	156575,
-	156815,
-	157055,
-	157296,
-	157538,
-	157781,
-	158025,
-	158269,
-	158514,
-	158760,
-	159006,
-	159253,
-	159502,
-	159750,
-	160000,
-	160250,
-	160502,
-	160754,
-	161006,
-	161260,
-	161514,
-	161769,
-	162025,
-	162282,
-	162540,
-	162798,
-	163057,
-	163317,
-	163578,
-	163840,
-	164103,
-	164366,
-	164630,
-	164895,
-	165161,
-	165428,
-	165696,
-	165964,
-	166234,
-	166504,
-	166775,
-	167047,
-	167320,
-	167594,
-	167869,
-	168144,
-	168421,
-	168699,
-	168977,
-	169256,
-	169536,
-	169818,
-	170100,
-	170383,
-	170667,
-	170952,
-	171237,
-	171524,
-	171812,
-	172101,
-	172391,
-	172681,
-	172973,
-	173266,
-	173559,
-	173854,
-	174150,
-	174446,
-	174744,
-	175043,
-	175342,
-	175643,
-	175945,
-	176248,
-	176552,
-	176857,
-	177163,
-	177470,
-	177778,
-	178087,
-	178397,
-	178709,
-	179021,
-	179335,
-	179649,
-	179965,
-	180282,
-	180600,
-	180919,
-	181239,
-	181560,
-	181883,
-	182206,
-	182531,
-	182857,
-	183184,
-	183513,
-	183842,
-	184173,
-	184505,
-	184838,
-	185172,
-	185507,
-	185844,
-	186182,
-	186521,
-	186861,
-	187203,
-	187546,
-	187890,
-	188235,
-	188582,
-	188930,
-	189279,
-	189630,
-	189981,
-	190335,
-	190689,
-	191045,
-	191402,
-	191760,
-	192120,
-	192481,
-	192844,
-	193208,
-	193573,
-	193939,
-	194307,
-	194677,
-	195048,
-	195420,
-	195793,
-	196169,
-	196545,
-	196923,
-	197303,
-	197683,
-	198066,
-	198450,
-	198835,
-	199222,
-	199610,
-	200000,
-	200391,
-	200784,
-	201179,
-	201575,
-	201972,
-	202372,
-	202772,
-	203175,
-	203579,
-	203984,
-	204391,
-	204800,
-	205210,
-	205622,
-	206036,
-	206452,
-	206869,
-	207287,
-	207708,
-	208130,
-	208554,
-	208980,
-	209407,
-	209836,
-	210267,
-	210700,
-	211134,
-	211570,
-	212008,
-	212448,
-	212890,
-	213333,
-	213779,
-	214226,
-	214675,
-	215126,
-	215579,
-	216034,
-	216490,
-	216949,
-	217410,
-	217872,
-	218337,
-	218803,
-	219272,
-	219742,
-	220215,
-	220690,
-	221166,
-	221645,
-	222126,
-	222609,
-	223094,
-	223581,
-	224070,
-	224561,
-	225055,
-	225551,
-	226049,
-	226549,
-	227051,
-	227556,
-	228062,
-	228571,
-	229083,
-	229596,
-	230112,
-	230631,
-	231151,
-	231674,
-	232200,
-	232727,
-	233257,
-	233790,
-	234325,
-	234862,
-	235402,
-	235945,
-	236490,
-	237037,
-	237587,
-	238140,
-	238695,
-	239252,
-	239813,
-	240376,
-	240941,
-	241509,
-	242080,
-	242654,
-	243230,
-	243810,
-	244391,
-	244976,
-	245564,
-	246154,
-	246747,
-	247343,
-	247942,
-	248544,
-	249148,
-	249756,
-	250367,
-	250980,
-	251597,
-	252217,
-	252840,
-	253465,
-	254094,
-	254726,
-	255362,
-	256000,
-	256642,
-	257286,
-	257935,
-	258586,
-	259241,
-	259898,
-	260560,
-	261224,
-	261893,
-	262564,
-	263239,
-	263918,
-	264599,
-	265285,
-	265974,
-	266667,
-	267363,
-	268063,
-	268766,
-	269474,
-	270185,
-	270899,
-	271618,
-	272340,
-	273067,
-	273797,
-	274531,
-	275269,
-	276011,
-	276757,
-	277507,
-	278261,
-	279019,
-	279781,
-	280548,
-	281319,
-	282094,
-	282873,
-	283657,
-	284444,
-	285237,
-	286034,
-	286835,
-	287640,
-	288451,
-	289266,
-	290085,
-	290909,
-	291738,
-	292571,
-	293410,
-	294253,
-	295101,
-	295954,
-	296812,
-	297674,
-	298542,
-	299415,
-	300293,
-	301176,
-	302065,
-	302959,
-	303858,
-	304762,
-	305672,
-	306587,
-	307508,
-	308434,
-	309366,
-	310303,
-	311246,
-	312195,
-	313150,
-	314110,
-	315077,
-	316049,
-	317028,
-	318012,
-	319003,
-	320000,
-	321003,
-	322013,
-	323028,
-	324051,
-	325079,
-	326115,
-	327157,
-	328205,
-	329260,
-	330323,
-	331392,
-	332468,
-	333550,
-	334641,
-	335738,
-	336842,
-	337954,
-	339073,
-	340199,
-	341333,
-	342475,
-	343624,
-	344781,
-	345946,
-	347119,
-	348299,
-	349488,
-	350685,
-	351890,
-	353103,
-	354325,
-	355556,
-	356794,
-	358042,
-	359298,
-	360563,
-	361837,
-	363121,
-	364413,
-	365714,
-	367025,
-	368345,
-	369675,
-	371014,
-	372364,
-	373723,
-	375092,
-	376471,
-	377860,
-	379259,
-	380669,
-	382090,
-	383521,
-	384962,
-	386415,
-	387879,
-	389354,
-	390840,
-	392337,
-	393846,
-	395367,
-	396899,
-	398444,
-	400000,
-	401569,
-	403150,
-	404743,
-	406349,
-	407968,
-	409600,
-	411245,
-	412903,
-	414575,
-	416260,
-	417959,
-	419672,
-	421399,
-	423140,
-	424896,
-	426667,
-	428452,
-	430252,
-	432068,
-	433898,
-	435745,
-	437607,
-	439485,
-	441379,
-	443290,
-	445217,
-	447162,
-	449123,
-	451101,
-	453097,
-	455111,
-	457143,
-	459193,
-	461261,
-	463348,
-	465455,
-	467580,
-	469725,
-	471889,
-	474074,
-	476279,
-	478505,
-	480751,
-	483019,
-	485308,
-	487619,
-	489952,
-	492308,
-	494686,
-	497087,
-	499512,
-	501961,
-	504433,
-	506931,
-	509453,
-	512000,
-	514573,
-	517172,
-	519797,
-	522449,
-	525128,
-	527835,
-	530570,
-	533333,
-	536126,
-	538947,
-	541799,
-	544681,
-	547594,
-	550538,
-	553514,
-	556522,
-	559563,
-	562637,
-	565746,
-	568889,
-	572067,
-	575281,
-	578531,
-	581818,
-	585143,
-	588506,
-	591908,
-	595349,
-	598830,
-	602353,
-	605917,
-	609524,
-	613174,
-	616867,
-	620606,
-	624390,
-	628221,
-	632099,
-	636025,
-	640000,
-	644025,
-	648101,
-	652229,
-	656410,
-	660645,
-	664935,
-	669281,
-	673684,
-	678146,
-	682667,
-	687248,
-	691892,
-	696599,
-	701370,
-	706207,
-	711111,
-	716084,
-	721127,
-	726241,
-	731429,
-	736691,
-	742029,
-	747445,
-	752941,
-	758519,
-	764179,
-	769925,
-	775758,
-	781679,
-	787692,
-	793798,
-	800000,
-	806299,
-	812698,
-	819200,
-	825806,
-	832520,
-	839344,
-	846281,
-	853333,
-	860504,
-	867797,
-	875214,
-	882759,
-	890435,
-	898246,
-	906195,
-	914286,
-	922523,
-	930909,
-	939450,
-	948148,
-	957009,
-	966038,
-	975238,
-	984615,
-	994175,
-	1003922,
-	1013861,
-	1024000,
-	1034343,
-	1044898,
-	1055670,
-	1066667,
-	1077895,
-	1089362,
-	1101075,
-	1113043,
-	1125275,
-	1137778,
-	1150562,
-	1163636,
-	1177011,
-	1190698,
-	1204706,
-	1219048,
-	1233735,
-	1248780,
-	1264198,
-	1280000,
-	1296203,
-	1312821,
-	1329870,
-	1347368,
-	1365333,
-	1383784,
-	1402740,
-	1422222,
-	1442254,
-	1462857,
-	1484058,
-	1505882,
-	1528358,
-	1551515,
-	1575385,
-	1600000,
-};
 
 static kal_uint16 read_cmos_sensor(kal_uint32 addr)
 {
@@ -1645,8 +677,8 @@ static kal_uint16 read_cmos_sensor(kal_uint32 addr)
 
 	char pu_send_cmd[2] = { (char)(addr >> 8), (char)(addr & 0xFF) };
 
-	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1,
-		    imgsensor.i2c_write_id);
+	iReadRegI2C(pu_send_cmd, 2,
+		(u8 *) &get_byte, 1, imgsensor.i2c_write_id);
 
 	return get_byte;
 }
@@ -1793,7 +825,7 @@ static kal_uint32 return_lot_id_from_otp(void)
 	 * read_cmos_sensor(0x0A38)<<4,read_cmos_sensor(0x0A39)>>4);
 	 */
 	return ((read_cmos_sensor(0x0A22) << 4) |
-					read_cmos_sensor(0x0A23) >> 4);
+			read_cmos_sensor(0x0A23) >> 4);
 }
 
 static void set_max_framerate(UINT16 framerate, kal_bool min_framelength_en)
@@ -1883,7 +915,7 @@ if (shutter > (imgsensor_info.max_frame_length - imgsensor_info.margin)) {
 	/* long expsoure */
 	for (l_shift = 1; l_shift < MAX_CIT_LSHIFT; l_shift++) {
 		if ((shutter >> l_shift) <
-		  (imgsensor_info.max_frame_length - imgsensor_info.margin))
+		    (imgsensor_info.max_frame_length - imgsensor_info.margin))
 			break;
 	}
 	if (l_shift > MAX_CIT_LSHIFT) {
@@ -1944,11 +976,10 @@ if (shutter > (imgsensor_info.max_frame_length - imgsensor_info.margin)) {
 	write_cmos_sensor(0x0104, 0x00);
 	LOG_INF("Exit! shutter =%d, framelength =%d\n",
 		shutter, imgsensor.frame_length);
-} /*    set_shutter */
+}				/*    set_shutter */
 
 static void set_shutter_frame_length(
-			kal_uint16 shutter, kal_uint16 frame_length,
-			kal_bool auto_extend_en)
+			kal_uint16 shutter, kal_uint16 frame_length)
 {
 	unsigned long flags;
 	kal_uint16 realtime_fps = 0;
@@ -2013,10 +1044,7 @@ static void set_shutter_frame_length(
 
 	/* Update Shutter */
 	write_cmos_sensor(0x0104, 0x01);
-	if (auto_extend_en)
-		write_cmos_sensor(0x0350, 0x01); /* Enable auto extend */
-	else
-		write_cmos_sensor(0x0350, 0x00); /* Disable auto extend */
+	write_cmos_sensor(0x0350, 0x00);	/* Disable auto extend */
 	write_cmos_sensor(0x0202, (shutter >> 8) & 0xFF);
 	write_cmos_sensor(0x0203, shutter & 0xFF);
 	write_cmos_sensor(0x0104, 0x00);
@@ -2066,21 +1094,20 @@ static kal_uint16 set_gain(kal_uint16 gain)
 	/* Total gain = M + N /16 X   */
 
 	/*  */
-	if (gain < imgsensor_info.min_gain || gain > imgsensor_info.max_gain) {
+	if (gain < BASEGAIN || gain > 8 * BASEGAIN) {
 		LOG_INF("Error gain setting");
 
-		if (gain < imgsensor_info.min_gain)
-			gain = imgsensor_info.min_gain;
-		else
-			gain = imgsensor_info.max_gain;
+		if (gain < BASEGAIN)
+			gain = BASEGAIN;
+		else if (gain > 8 * BASEGAIN)
+			gain = 8 * BASEGAIN;
 	}
-
 
 	reg_gain = gain2reg(gain);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.gain = reg_gain;
 	spin_unlock(&imgsensor_drv_lock);
-	LOG_INF("gain = %d, reg_gain = 0x%x\n ", gain, reg_gain);
+	LOG_INF("gain = %d , reg_gain = 0x%x\n ", gain, reg_gain);
 
 	write_cmos_sensor(0x0104, 0x01);
 	/* Global analog Gain for Long expo */
@@ -2119,17 +1146,14 @@ static kal_uint16 set_dual_gain(kal_uint16 gain1, kal_uint16 gain2)
 	/* [4:9] = M meams M X         */
 	/* Total gain = M + N /16 X   */
 
+	if (gain1 < BASEGAIN || gain1 > 8 * BASEGAIN) {
+		LOG_INF("Error gain1 setting");
 
-	if (gain1 < imgsensor_info.min_gain ||
-		gain1 > imgsensor_info.max_gain) {
-		LOG_INF("Error gain setting");
-
-		if (gain1 < imgsensor_info.min_gain)
-			gain1 = imgsensor_info.min_gain;
-		else
-			gain1 = imgsensor_info.max_gain;
+		if (gain1 < BASEGAIN)
+			gain1 = BASEGAIN;
+		else if (gain1 > 8 * BASEGAIN)
+			gain1 = 8 * BASEGAIN;
 	}
-
 
 	if (gain2 < BASEGAIN || gain2 > 8 * BASEGAIN) {
 		LOG_INF("Error gain2 setting");
@@ -2147,7 +1171,7 @@ static kal_uint16 set_dual_gain(kal_uint16 gain1, kal_uint16 gain2)
 	imgsensor.gain = reg_gain1;
 	spin_unlock(&imgsensor_drv_lock);
 	LOG_INF(
-		"gain1 = %d, reg_gain1 = 0x%x, gain2 = %d, reg_gain2 = 0x%x\n",
+		"gain1 = %d , reg_gain1 = 0x%x, gain2 = %d , reg_gain2 = 0x%x\n ",
 				gain1, reg_gain1, gain2, reg_gain2);
 
 	write_cmos_sensor(0x0104, 0x01);
@@ -3078,9 +2102,6 @@ kal_uint16 addr_data_pair_capture_imx350[] = {
 	0x0219, 0x00,
 #endif
 
-	0x0830, 0x00,
-	0x0831, 0x00,
-	0x0832, 0x00,
 
 	0xE000, 0x00
 };
@@ -3253,16 +2274,12 @@ kal_uint16 addr_data_pair_video_imx350[] = {
 	0x0218, 0x01,
 	0x0219, 0x00,
 
-	0x0830, 0x00,
-	0x0831, 0x00,
-	0x0832, 0x00,
-
 	0xE000, 0x00,
 };
 
 static void normal_video_setting(kal_uint16 currefps)
 {
-	LOG_INF("E! %s:%d\n", __func__, currefps);
+	LOG_INF("E!%d\n", currefps);
 
 	imx350_table_write_cmos_sensor(addr_data_pair_video_imx350,
 	sizeof(addr_data_pair_video_imx350) / sizeof(kal_uint16));
@@ -3392,23 +2409,7 @@ static void hs_video_setting(void)
 	sizeof(addr_data_pair_hs_video_imx350) / sizeof(kal_uint16));
 	zvhdr_setting();
 }
-#if 1
-extern bool is_factory_mode(void);// zwb modifed for CTS Test
-static kal_uint32 set_test_pattern_mode_ata(kal_bool enable)
-{
-	LOG_INF("enable: %d\n", enable);
 
-	if (enable)
-		write_cmos_sensor(0x0601, 0x01);
-	else
-		write_cmos_sensor(0x0601, 0x00);
-
-	spin_lock(&imgsensor_drv_lock);
-	imgsensor.test_pattern = enable;
-	spin_unlock(&imgsensor_drv_lock);
-	return ERROR_NONE;
-}
-#endif
 static kal_uint32 set_test_pattern_mode(kal_bool enable)
 {
 	LOG_INF("enable: %d\n", enable);
@@ -3440,9 +2441,6 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
  * GLOBALS AFFECTED
  *
  *************************************************************************/
-#if IS_ENABLED(CONFIG_WB_BOARD_ID_SUPPORT) //Leo 20230417
-extern int cust_midmisc_get_board_id(void);
-#endif
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
@@ -3450,14 +2448,6 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 	/* sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
 	 * we should detect the module used i2c address
 	 */
-
-#if IS_ENABLED(CONFIG_WB_BOARD_ID_SUPPORT) //Leo 20230131
-	if (1 == cust_midmisc_get_board_id()) {
-		*sensor_id = 0xFFFFFFFF;
-		return ERROR_SENSOR_CONNECT_FAIL;
-	}
-#endif
-
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
@@ -3512,6 +2502,7 @@ static kal_uint32 open(void)
 	kal_uint32 sensor_id = 0;
 
 	LOG_1;
+	LOG_2;
 
 	KD_SENSOR_PROFILE_INIT();
 	/* sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
@@ -3542,7 +2533,7 @@ static kal_uint32 open(void)
 	if (imgsensor_info.sensor_id != sensor_id)
 		return ERROR_SENSOR_CONNECT_FAIL;
 
-	KD_SENSOR_PROFILE("imx350_open_1");
+	KD_SENSOR_PROFILE("open1");
 	/* initail sequence write in  */
 	sensor_init();
 
@@ -3563,9 +2554,9 @@ static kal_uint32 open(void)
 	imgsensor.current_fps = imgsensor_info.pre.max_framerate;
 	spin_unlock(&imgsensor_drv_lock);
 
-	KD_SENSOR_PROFILE("imx350_open_2");
+	KD_SENSOR_PROFILE("open2");
 	return ERROR_NONE;
-} /* open */
+}				/*    open  */
 
 /*************************************************************************
  * FUNCTION
@@ -3806,10 +2797,6 @@ static kal_uint32 get_info(enum MSDK_SCENARIO_ID_ENUM scenario_id,
 #else
 	sensor_info->HDR_Support = 2;	/*0: NO HDR, 1: iHDR, 2:mvHDR, 3:zHDR */
 #endif
-
-	sensor_info->SensorHorFOV = H_FOV;
-	sensor_info->SensorVerFOV = V_FOV;
-
 	sensor_info->SensorMIPILaneNumber = imgsensor_info.mipi_lane_num;
 	sensor_info->SensorClockFreq = imgsensor_info.mclk;
 	sensor_info->SensorClockDividCount = 3;	/* not use */
@@ -4051,24 +3038,20 @@ static kal_uint32 imx350_awb_gain(struct SET_SENSOR_AWB_GAIN *pSetSensorAWB)
 {
 	UINT32 rgain_32, grgain_32, gbgain_32, bgain_32;
 
-	LOG_INF("%s\n", __func__);
+	LOG_INF("E\n");
 
 	grgain_32 = (pSetSensorAWB->ABS_GAIN_GR << 8) >> 9;
 	rgain_32 = (pSetSensorAWB->ABS_GAIN_R << 8) >> 9;
 	bgain_32 = (pSetSensorAWB->ABS_GAIN_B << 8) >> 9;
 	gbgain_32 = (pSetSensorAWB->ABS_GAIN_GB << 8) >> 9;
 
-	LOG_INF("[%s] ABS_GAIN_GR:%d, grgain_32:%d\n",
-		__func__,
+	LOG_INF("ABS_GAIN_GR:%d, grgain_32:%d\n",
 		pSetSensorAWB->ABS_GAIN_GR,	grgain_32);
-	LOG_INF("[%s] ABS_GAIN_R:%d, rgain_32:%d\n",
-		__func__,
+	LOG_INF("ABS_GAIN_R:%d, rgain_32:%d\n",
 		pSetSensorAWB->ABS_GAIN_R, rgain_32);
-	LOG_INF("[%s] ABS_GAIN_B:%d, bgain_32:%d\n",
-		__func__,
+	LOG_INF("ABS_GAIN_B:%d, bgain_32:%d\n",
 		pSetSensorAWB->ABS_GAIN_B, bgain_32);
-	LOG_INF("[%s] ABS_GAIN_GB:%d, gbgain_32:%d\n",
-		__func__,
+	LOG_INF("ABS_GAIN_GB:%d, gbgain_32:%d\n",
 		pSetSensorAWB->ABS_GAIN_GB,	gbgain_32);
 
 	write_cmos_sensor(0x0b8e, (grgain_32 >> 8) & 0xFF);
@@ -4120,80 +3103,11 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 	struct SENSOR_VC_INFO_STRUCT *pvcinfo;
 	struct SET_SENSOR_AWB_GAIN *pSetSensorAWB =
 		(struct SET_SENSOR_AWB_GAIN *) feature_para;
-
 	MSDK_SENSOR_REG_INFO_STRUCT *sensor_reg_data =
 		(MSDK_SENSOR_REG_INFO_STRUCT *) feature_para;
 
 /*LOG_INF("feature_id = %d\n", feature_id);*/
 	switch (feature_id) {
-	case SENSOR_FEATURE_GET_ANA_GAIN_TABLE:
-		if ((void *)(uintptr_t) (*(feature_data + 1)) == NULL) {
-			*(feature_data + 0) =
-				sizeof(ana_gain_table_16x);
-		} else {
-			memcpy((void *)(uintptr_t) (*(feature_data + 1)),
-			(void *)ana_gain_table_16x,
-			sizeof(ana_gain_table_16x));
-		}
-		break;
-	case SENSOR_FEATURE_GET_GAIN_RANGE_BY_SCENARIO:
-		*(feature_data + 1) = imgsensor_info.min_gain;
-		*(feature_data + 2) = imgsensor_info.max_gain;
-		break;
-	case SENSOR_FEATURE_GET_BASE_GAIN_ISO_AND_STEP:
-		*(feature_data + 0) = imgsensor_info.min_gain_iso;
-		*(feature_data + 1) = imgsensor_info.gain_step;
-		*(feature_data + 2) = imgsensor_info.gain_type;
-		break;
-	case SENSOR_FEATURE_GET_MIN_SHUTTER_BY_SCENARIO:
-		*(feature_data + 1) = imgsensor_info.min_shutter;
-		break;
-	case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ_BY_SCENARIO:
-		switch (*feature_data) {
-		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.cap.pclk;
-			break;
-		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.normal_video.pclk;
-			break;
-		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.hs_video.pclk;
-			break;
-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
-		default:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.pre.pclk;
-			break;
-		}
-		break;
-	case SENSOR_FEATURE_GET_PERIOD_BY_SCENARIO:
-		switch (*feature_data) {
-		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-			= (imgsensor_info.cap.framelength << 16)
-				+ imgsensor_info.cap.linelength;
-			break;
-		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-			= (imgsensor_info.normal_video.framelength << 16)
-				+ imgsensor_info.normal_video.linelength;
-			break;
-		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-			= (imgsensor_info.hs_video.framelength << 16)
-				+ imgsensor_info.hs_video.linelength;
-			break;
-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
-		default:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-			= (imgsensor_info.pre.framelength << 16)
-				+ imgsensor_info.pre.linelength;
-			break;
-		}
-		break;
 	case SENSOR_FEATURE_GET_PERIOD:
 		*feature_return_para_16++ = imgsensor.line_length;
 		*feature_return_para_16 = imgsensor.frame_length;
@@ -4262,16 +3176,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 				(kal_uint32) (*(feature_data + 2)));
 		break;
 	case SENSOR_FEATURE_SET_TEST_PATTERN:
-	  if (is_factory_mode()) //zxs 20220526
-      {
-		printk("is_factory_mode:%d\n", __LINE__);
-				set_test_pattern_mode((BOOL)(*feature_data));
-
-        }
-		else{
-			printk("is not factory_mode:%d\n", __LINE__);
-        set_test_pattern_mode_ata((BOOL)*feature_data);
-		}
+		set_test_pattern_mode((BOOL)(*feature_data));
 		break;
 
 	/* for factory mode auto testing */
@@ -4289,29 +3194,29 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		LOG_INF("SENSOR_FEATURE_GET_CROP_INFO scenarioId:%d\n",
 			(UINT32) *feature_data);
 
-		wininfo =
-	(struct SENSOR_WINSIZE_INFO_STRUCT *) (uintptr_t) (*(feature_data + 1));
+		wininfo = (struct SENSOR_WINSIZE_INFO_STRUCT *)
+			(uintptr_t) (*(feature_data + 1));
 
 		switch (*feature_data_32) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 			memcpy((void *)wininfo,
 				(void *)&imgsensor_winsize_info[1],
-			    sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			       sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
 			memcpy((void *)wininfo,
 				(void *)&imgsensor_winsize_info[2],
-			    sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			       sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
 			memcpy((void *)wininfo,
 				(void *)&imgsensor_winsize_info[3],
-			    sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			       sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 			memcpy((void *)wininfo,
 				(void *)&imgsensor_winsize_info[0],
-			    sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
+			       sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		default:
 			break;
@@ -4336,8 +3241,8 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 	case SENSOR_FEATURE_GET_VC_INFO:
 		LOG_INF("SENSOR_FEATURE_GET_VC_INFO %d\n",
 			(UINT16) *feature_data);
-		pvcinfo =
-	     (struct SENSOR_VC_INFO_STRUCT *) (uintptr_t) (*(feature_data + 1));
+		pvcinfo = (struct SENSOR_VC_INFO_STRUCT *)
+			(uintptr_t) (*(feature_data + 1));
 		switch (*feature_data_32) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 			memcpy((void *)pvcinfo, (void *)&SENSOR_VC_INFO[1],
@@ -4354,16 +3259,13 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 			break;
 		}
 		break;
-	case SENSOR_FEATURE_GET_AWB_REQ_BY_SCENARIO:
-		*(MUINT32 *)(uintptr_t)(*(feature_data + 1)) = 1;
-		break;
 	case SENSOR_FEATURE_SET_AWB_GAIN:
 		imx350_awb_gain(pSetSensorAWB);
 		break;
 	case SENSOR_FEATURE_GET_SENSOR_HDR_CAPACITY:
 		LOG_INF(
-			"SENSOR_FEATURE_GET_SENSOR_HDR_CAPACITY scenarioId:%llu\n",
-			*feature_data);
+		    "SENSOR_FEATURE_GET_SENSOR_HDR_CAPACITY scenarioId:%llu\n",
+		    *feature_data);
 		/*
 		 * SENSOR_VHDR_MODE_NONE  = 0x0,
 		 * SENSOR_VHDR_MODE_IVHDR = 0x01,
@@ -4393,12 +3295,14 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		/*PDAF CMD */
 	case SENSOR_FEATURE_GET_SENSOR_PDAF_CAPACITY:
 		LOG_INF(
-			"SENSOR_FEATURE_GET_SENSOR_PDAF_CAPACITY scenarioId:%llu\n",
-			*feature_data);
-	/* PDAF capacity enable or not, 2p8 only full size support PDAF */
+		    "SENSOR_FEATURE_GET_SENSOR_PDAF_CAPACITY scenarioId:%llu\n",
+		    *feature_data);
+		/* PDAF capacity enable or not,
+		 * 2p8 only full size support PDAF
+		 */
 		switch (*feature_data) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
-			*(MUINT32 *) (uintptr_t) (*(feature_data + 1)) = 0;
+			*(MUINT32 *) (uintptr_t) (*(feature_data + 1)) = 1;
 			break;
 		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
 			*(MUINT32 *) (uintptr_t) (*(feature_data + 1)) = 0;
@@ -4420,17 +3324,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		break;
 	case SENSOR_FEATURE_SET_SHUTTER_FRAME_TIME:
 		set_shutter_frame_length(
-		    (UINT16)(*feature_data), (UINT16)(*(feature_data + 1)),
-		    (BOOL) (*(feature_data + 2)));
-		break;
-	case SENSOR_FEATURE_GET_FRAME_CTRL_INFO_BY_SCENARIO:
-		/*
-		 * 1, if driver support new sw frame sync
-		 * set_shutter_frame_length() support third para auto_extend_en
-		 */
-		*(feature_data + 1) = 1;
-		/* margin info by scenario */
-		*(feature_data + 2) = imgsensor_info.margin;
+		    (UINT16)(*feature_data), (UINT16)(*(feature_data + 1)));
 		break;
 	case SENSOR_FEATURE_GET_TEMPERATURE_VALUE:
 		*feature_return_para_i32 = get_sensor_temperature();
@@ -4464,28 +3358,26 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		LOG_INF("SENSOR_FEATURE_SET_STREAMING_RESUME\n");
 		streaming_control(KAL_TRUE);
 		break;
-
 	case SENSOR_FEATURE_GET_MIPI_PIXEL_RATE:
 	{
+		kal_uint32 rate;
+
 		switch (*feature_data) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.cap.mipi_pixel_rate;
+			rate = imgsensor_info.cap.mipi_pixel_rate;
 			break;
 		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.normal_video.mipi_pixel_rate;
+			rate = imgsensor_info.normal_video.mipi_pixel_rate;
 			break;
 		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.hs_video.mipi_pixel_rate;
+			rate = imgsensor_info.hs_video.mipi_pixel_rate;
 			break;
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 		default:
-			*(MUINT32 *)(uintptr_t)(*(feature_data + 1))
-				= imgsensor_info.pre.mipi_pixel_rate;
+			rate = imgsensor_info.pre.mipi_pixel_rate;
 			break;
 		}
+		*(MUINT32 *)(uintptr_t)(*(feature_data + 1)) = rate;
 	}
 	break;
 

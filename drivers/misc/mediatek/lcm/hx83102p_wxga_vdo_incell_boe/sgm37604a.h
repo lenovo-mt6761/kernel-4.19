@@ -12,8 +12,8 @@ struct sgm37604a_setting_table {
 	unsigned char data;
 };
 
-extern int sgm37604a_read_byte(unsigned char cmd, unsigned char *returnData);
-extern int sgm37604a_write_byte(unsigned char cmd, unsigned char writeData);
+extern int hx83102p_sgm37604a_read_byte(unsigned char cmd, unsigned char *returnData);
+extern int hx83102p_sgm37604a_write_byte(unsigned char cmd, unsigned char writeData);
 #endif
 
 #endif

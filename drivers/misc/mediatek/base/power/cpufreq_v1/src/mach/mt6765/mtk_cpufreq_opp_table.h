@@ -436,7 +436,7 @@
 
 /* C62 */
 /* for DVFS OPP table L */
-#define CPU_DVFS_FREQ0_L_C62    2400000    /* KHz */
+#define CPU_DVFS_FREQ0_L_C62    2001000    /* KHz */
 #define CPU_DVFS_FREQ1_L_C62    1961000    /* KHz */
 #define CPU_DVFS_FREQ2_L_C62    1927000    /* KHz */
 #define CPU_DVFS_FREQ3_L_C62    1897000    /* KHz */
@@ -454,7 +454,7 @@
 #define CPU_DVFS_FREQ15_L_C62    900000    /* KHz */
 
 /* for DVFS OPP table LL */
-#define CPU_DVFS_FREQ0_LL_C62    1800000    /* KHz */
+#define CPU_DVFS_FREQ0_LL_C62    1500000    /* KHz */
 #define CPU_DVFS_FREQ1_LL_C62    1429000    /* KHz */
 #define CPU_DVFS_FREQ2_LL_C62    1367000    /* KHz */
 #define CPU_DVFS_FREQ3_LL_C62    1314000    /* KHz */
@@ -1079,7 +1079,7 @@
 
 /* C65X */
 /* for DVFS OPP table L */
-#define CPU_DVFS_FREQ0_L_C65X    2600000    /* KHz */
+#define CPU_DVFS_FREQ0_L_C65X    2200000    /* KHz */
 #define CPU_DVFS_FREQ1_L_C65X    2130000    /* KHz */
 #define CPU_DVFS_FREQ2_L_C65X    2068000    /* KHz */
 #define CPU_DVFS_FREQ3_L_C65X    2015000    /* KHz */
@@ -1097,7 +1097,7 @@
 #define CPU_DVFS_FREQ15_L_C65X    900000    /* KHz */
 
 /* for DVFS OPP table LL */
-#define CPU_DVFS_FREQ0_LL_C65X    2000000    /* KHz */
+#define CPU_DVFS_FREQ0_LL_C65X    1600000    /* KHz */
 #define CPU_DVFS_FREQ1_LL_C65X    1515000    /* KHz */
 #define CPU_DVFS_FREQ2_LL_C65X    1439000    /* KHz */
 #define CPU_DVFS_FREQ3_LL_C65X    1374000    /* KHz */
@@ -1133,7 +1133,7 @@
 #define CPU_DVFS_FREQ15_CCI_C65X    300000    /* KHz */
 
 /* for DVFS OPP table */
-#define CPU_DVFS_VOLT0_VPROC_L_C65X    119500           /* 10uV */
+#define CPU_DVFS_VOLT0_VPROC_L_C65X    120000           /* 10uV */
 #define CPU_DVFS_VOLT1_VPROC_L_C65X    115000           /* 10uV */
 #define CPU_DVFS_VOLT2_VPROC_L_C65X    110000           /* 10uV */
 #define CPU_DVFS_VOLT3_VPROC_L_C65X    105625           /* 10uV */
@@ -1150,7 +1150,7 @@
 #define CPU_DVFS_VOLT14_VPROC_L_C65X    62500           /* 10uV */
 #define CPU_DVFS_VOLT15_VPROC_L_C65X    60000           /* 10uV */
 
-#define CPU_DVFS_VOLT0_VPROC_LL_C65X    119500           /* 10uV */
+#define CPU_DVFS_VOLT0_VPROC_LL_C65X    120000           /* 10uV */
 #define CPU_DVFS_VOLT1_VPROC_LL_C65X    115000           /* 10uV */
 #define CPU_DVFS_VOLT2_VPROC_LL_C65X    110000           /* 10uV */
 #define CPU_DVFS_VOLT3_VPROC_LL_C65X    105625           /* 10uV */

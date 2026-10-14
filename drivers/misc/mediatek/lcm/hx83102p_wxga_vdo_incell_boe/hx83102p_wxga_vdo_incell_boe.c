@@ -443,9 +443,9 @@ static void lcm_init_lcm(void)
 	lcm_set_gpio_output(GPIO_LCD_BL_EN, GPIO_OUT_ONE);
 	MDELAY(5);
 	//register
-	sgm37604a_write_byte(0x11, 0x00);
-	sgm37604a_write_byte(0x1A, 0);
-	sgm37604a_write_byte(0x19, 0);
+	hx83102p_sgm37604a_write_byte(0x11, 0x00);
+	hx83102p_sgm37604a_write_byte(0x1A, 0);
+	hx83102p_sgm37604a_write_byte(0x19, 0);
 	MDELAY(10);
 
 	push_table(lcm_initinal_setting,
@@ -522,7 +522,7 @@ static void lcm_setbacklight_cmdq(void *handle, unsigned int level)
 	if (level > 255)
 		level = 255;
 
-	sgm_level = backlight_i2c_map_hx[level];
+	sgm_level = hx83102p_backlight_i2c_map_hx[level];
 	pr_info("lsy_kernel %s,hx83102p backlight: level = %d sgm_level = %d\n",
 			__func__, level, sgm_level);
 
@@ -531,8 +531,8 @@ static void lcm_setbacklight_cmdq(void *handle, unsigned int level)
 			s_last_backlight_level++;
 		else if (level < s_last_backlight_level)
 			s_last_backlight_level--;
-		sgm37604a_write_byte(0x1A, (backlight_i2c_map_hx[s_last_backlight_level] & 0x0F));
-		sgm37604a_write_byte(0x19, (backlight_i2c_map_hx[s_last_backlight_level] >> 4));
+		hx83102p_sgm37604a_write_byte(0x1A, (hx83102p_backlight_i2c_map_hx[s_last_backlight_level] & 0x0F));
+		hx83102p_sgm37604a_write_byte(0x19, (hx83102p_backlight_i2c_map_hx[s_last_backlight_level] >> 4));
 	}
 	pr_info("s_last_backlight_level=%d\n", s_last_backlight_level);
 }

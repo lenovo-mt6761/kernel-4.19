@@ -111,7 +111,7 @@ static void init_sensorlist_info(void)
 			sizeof(sensorlist_info[handle].name));
 }
 
-#ifdef CONFIG_CUSTOM_KERNEL_SENSORHUB
+#if 1//def CONFIG_CUSTOM_KERNEL_SENSORHUB
 static void sensorlist_get_deviceinfo(struct work_struct *work)
 {
 	int err = 0, handle = -1, sensor = -1;
@@ -154,7 +154,7 @@ static struct scp_power_monitor scp_ready_notifier = {
 	.name = "sensorlist",
 	.notifier_call = scp_ready_event,
 };
-#else
+//#else
 int sensorlist_register_deviceinfo(int sensor,
 		struct sensorInfo_NonHub_t *devinfo)
 {

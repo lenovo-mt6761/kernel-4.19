@@ -255,10 +255,6 @@ void aed_common_exception_api(const char *assert_type, const int *log, int
 
 int aed_get_status(void);
 int aee_is_printk_too_much(const char *module);
-#if defined(CONFIG_MTK_AEE_FEATURE)
 void aee_sram_printk(const char *fmt, ...);
-#else
-static inline void aee_sram_printk(const char *fmt, ...) { return; };
-#endif
 int aee_is_enable(void);
 #endif/* __AEE_H__ */

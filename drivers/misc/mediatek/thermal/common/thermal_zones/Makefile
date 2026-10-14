@@ -154,6 +154,7 @@ endif
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6761"))
 
 obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
+obj-$(CONFIG_THERMAL) += mtk_ts_btsnrpa.o
 
 obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_btsmdpa.o
@@ -169,9 +170,8 @@ else
 obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
 endif
 else
-obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
+obj-$(CONFIG_THERMAL) += mtk_ts_btscharger.o
 endif
-obj-$(CONFIG_THERMAL) += mtk_ts_charger2.o
 
 ifneq ($(CONFIG_MTK_COMBO_WIFI),)
     obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
@@ -184,6 +184,8 @@ endif
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6765"))
 
 obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
+
+obj-$(CONFIG_THERMAL) += mtk_ts_btsnrpa.o
 
 obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_btsmdpa.o
@@ -199,9 +201,8 @@ else
 obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
 endif
 else
-obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
+obj-$(CONFIG_THERMAL) += mtk_ts_btscharger.o
 endif
-obj-$(CONFIG_THERMAL) += mtk_ts_charger2.o
 
 ifneq ($(CONFIG_MTK_COMBO_WIFI),)
     obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o

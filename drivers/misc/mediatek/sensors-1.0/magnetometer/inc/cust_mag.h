@@ -23,5 +23,5 @@ struct mag_hw {
 	bool is_batch_supported;
 };
 
-int get_mag_dts_func(const char *name, struct mag_hw *hw);
+int get_mag_dts_func(struct device_node *node, struct mag_hw *hw);
 #endif

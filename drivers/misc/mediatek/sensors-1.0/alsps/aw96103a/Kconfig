@@ -1,0 +1,3 @@
+
+config AW9610X_SAR
+	bool "AW9610X_SAR for MediaTek alsps package"

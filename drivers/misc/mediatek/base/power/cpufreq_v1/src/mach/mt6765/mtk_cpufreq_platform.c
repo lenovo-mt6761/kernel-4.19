@@ -651,6 +651,21 @@ unsigned int _mt_cpufreq_get_cpu_level(void)
 		lv, turbo_flag, val, val_ly,
 		UP_VPROC_ST, DOWN_VPROC_ST,
 		UP_VSRAM_ST, DOWN_VSRAM_ST);
+
+	/* TB301FU (sjllls): this SoC is MT8768 ("62X"), but the efuse
+	 * reports the generic MT6765 "65" level (val=0x4, fabinfo2=0 ->
+	 * CPU_LEVEL_3).  The stock tree remapped CPU_LEVEL_3 ->
+	 * CPU_LEVEL_10 (c65x table) only at the three call sites in
+	 * mtk_cpufreq_main.c, leaving the hybrid-DVFS consumers (notably
+	 * cpuhvfs_pvt_tbl_create, which publishes the OPP P-V table to
+	 * the SSPM via shared csram) on the raw level-3 table.  The
+	 * kernel then advertised a 2200MHz policy while the SSPM applied
+	 * frequencies/voltages from the mismatched c65Tbl, and the perf
+	 * cluster (cpu0-3) never scaled.  Remap here so that every
+	 * consumer of _mt_cpufreq_get_cpu_level() agrees on level 10. */
+	if (lv == CPU_LEVEL_3)
+		lv = CPU_LEVEL_10;
+
 	/* free pdev */
 	if (pdev != NULL) {
 		of_platform_device_destroy(&pdev->dev, NULL);

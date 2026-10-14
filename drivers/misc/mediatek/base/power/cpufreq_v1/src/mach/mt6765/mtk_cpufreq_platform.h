@@ -41,11 +41,7 @@
 
 #define DVFSP_DT_NODE		"mediatek,mt6765-dvfsp"
 
-#ifdef CONFIG_MICROTRUST_TEE_LITE_SUPPORT
-#define CSRAM_BASE		0x00110800
-#else
-#define CSRAM_BASE              0x00110C00
-#endif
+#define CSRAM_BASE		0x00110C00
 #define CSRAM_SIZE		0x1400		/* 5K bytes */
 
 #define DVFS_LOG_NUM		150

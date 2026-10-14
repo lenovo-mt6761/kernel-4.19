@@ -198,14 +198,14 @@ static int spm_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 	case PM_POST_HIBERNATION:
 		return NOTIFY_DONE;
 	case PM_SUSPEND_PREPARE:
-		pr_debug(
+		printk_deferred(
 		"[name:spm&][SPM] PM: suspend entry %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 
 		return NOTIFY_DONE;
 	case PM_POST_SUSPEND:
-		pr_debug(
+		printk_deferred(
 		"[name:spm&][SPM] PM: suspend exit %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);

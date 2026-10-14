@@ -80,15 +80,15 @@ static bool smi_sspm_ipi_register;
 	do { \
 		if (cmdq != 0) \
 			cmdq_core_save_first_dump(string, ##args); \
-		pr_warn(string, ##args); \
+		pr_info(string, ##args); \
 	} while (0)
 #else
-#define SMIWRN(cmdq, string, args...) pr_warn(string, ##args)
+#define SMIWRN(cmdq, string, args...) pr_info(string, ##args)
 #endif
 
 #define SMIERR(string, args...) \
 	do { \
-		pr_err(string, ##args); \
+		pr_notice(string, ##args); \
 		aee_kernel_warning(DEV_NAME, string, ##args); \
 	} while (0)
 
@@ -465,7 +465,7 @@ void smi_ostd_update(const struct plist_head *head, const char *user)
 #if defined (CONFIG_MACH_MT6833)
 // TODO Migration
 	if (smi_dev[larb] == NULL){
-                 pr_err("[SMI 6833] ERROR smi_ostd_update larb not ready \n");
+                 pr_notice("[SMI 6833] ERROR smi_ostd_update larb not ready \n");
 		return;
 	}
 #endif
@@ -1510,7 +1510,7 @@ static inline void smi_dram_init(void)
 	smi_dram.node = debugfs_create_file(
 		"smi_mon", 0444, NULL, (void *)0, &smi_dram_file_opers);
 	if (IS_ERR(smi_dram.node))
-		pr_warn("debugfs_create_file failed: %ld\n",
+		pr_info("debugfs_create_file failed: %ld\n",
 			PTR_ERR(smi_dram.node));
 }
 

@@ -20,7 +20,11 @@ obj-y += ../common/$(COMMON_VERSION)/eeprom_i2c_common_driver.o
 
 # Platform code
 obj-y += eeprom_i2c_custom_driver.o
-
+obj-y += eeprom_i2c_gc02m1_driver.o
+obj-y += eeprom_i2c_gc08a3_driver.o
+obj-y += eeprom_i2c_lycni_sc501cs_driver.o
+obj-y += eeprom_i2c_txdii_sc501cs_driver.o
+obj-y += eeprom_i2c_sc202cs_driver.o
 
 define INC_CUSTOM_SRC
 ifeq ($(wildcard $(CAM_CAL_PLATFORM_SRC_PATH)/camera_project/$(ARCH_MTK_PROJECT)/$(1).c),)

@@ -2967,15 +2967,14 @@ void testcase_clkmgr_mdp(void)
 }
 #endif
 
-static s32 cmdq_mdp_enable_common_clock(bool enable)
+static void cmdq_mdp_enable_common_clock(bool enable)
 {
 #ifdef CMDQ_PWR_AWARE
 #ifdef CONFIG_MTK_SMI_EXT
-	s32 ret = 0;
 	if (enable) {
 		/* Use SMI clock API */
-		ret = smi_bus_prepare_enable(SMI_LARB2, "MDP");
-		ret |= smi_bus_prepare_enable(SMI_LARB3, "MDP");
+		smi_bus_prepare_enable(SMI_LARB2, "MDP");
+		smi_bus_prepare_enable(SMI_LARB3, "MDP");
 		cmdq_mdp_enable_clock_APB(enable);
 		cmdq_mdp_enable_clock_APMCU_GALS(enable);
 		cmdq_mdp_enable_clock_MDP_MUTEX0(enable);
@@ -2984,17 +2983,11 @@ static s32 cmdq_mdp_enable_common_clock(bool enable)
 		cmdq_mdp_enable_clock_MDP_MUTEX0(enable);
 		cmdq_mdp_enable_clock_APB(enable);
 		cmdq_mdp_enable_clock_APMCU_GALS(enable);
-		ret = smi_bus_disable_unprepare(SMI_LARB2, "MDP");
-		ret |= smi_bus_disable_unprepare(SMI_LARB3, "MDP");
-	}
-	if (ret) {
-		CMDQ_ERR("%s %s fail ret:%d\n",
-			__func__, enable ? "enable" : "disable", ret);
-		return TASK_STATE_ERROR;
+		smi_bus_disable_unprepare(SMI_LARB2, "MDP");
+		smi_bus_disable_unprepare(SMI_LARB3, "MDP");
 	}
 #endif
 #endif	/* CMDQ_PWR_AWARE */
-	return 0;
 }
 
 

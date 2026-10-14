@@ -40,6 +40,12 @@
 		}																			\
 	} while (0)
 
+/* TB301FU (sjllls): the bt_evt tracepoint corrupts vmlinux tracefs event
+ * registration when the BT driver is built-in (kernel panic in
+ * __trace_add_new_event/event_create_dir when init/atrace creates tracefs
+ * instances ~31s after boot). Debug-only facility: compile it out for
+ * built-in builds; bt_dbg_tp_evt() becomes a no-op (see wmt/...if.c). */
+#ifndef CONFIG_WLAN_DRV_BUILD_IN
 TRACE_EVENT(bt_evt,
 
 	TP_PROTO(unsigned int pkt_action,
@@ -66,6 +72,7 @@ TRACE_EVENT(bt_evt,
 	TP_printk("%d,%d,%d,%s",
 		__entry->pkt_action, __entry->parameter, __entry->data_len, __get_str(data))
 );
+#endif /* !CONFIG_WLAN_DRV_BUILD_IN */
 
 #endif /* _TRACE_BTMTK_DBG_EVENTS_H */
 

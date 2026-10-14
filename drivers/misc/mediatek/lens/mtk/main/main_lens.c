@@ -83,6 +83,13 @@ static struct stAF_OisPosInfo OisPosInfo;
 /* ------------------------- */
 
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
+	{1, AFDRV_DW9718PAF, DW9718PAF_SetI2Cclient, DW9718PAF_Ioctl,
+	 DW9718PAF_Release, DW9718PAF_GetFileName, NULL},
+	{1, AFDRV_GT9772AFI, GT9772AFI_SetI2Cclient, GT9772AFI_Ioctl,
+	 GT9772AFI_Release, GT9772AFI_GetFileName, NULL},
+	 {1, AFDRV_GT9772AFII, GT9772AFII_SetI2Cclient, GT9772AFII_Ioctl,
+	 GT9772AFII_Release, GT9772AFII_GetFileName, NULL},
+	 
 	{1, AFDRV_DW9718TAF, DW9718TAF_SetI2Cclient, DW9718TAF_Ioctl,
 	 DW9718TAF_Release, DW9718TAF_GetFileName, NULL},
 	{1, AFDRV_GT9772AF, GT9772AF_SetI2Cclient, GT9772AF_Ioctl,
@@ -99,9 +106,11 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 BU64253GWZAF_Release, BU64253GWZAF_GetFileName, NULL},
 	{1,
 #ifdef CONFIG_MTK_LENS_BU63165AF_SUPPORT
-	 AFDRV_BU63165AF, BU63165AF_SetI2Cclient, BU63165AF_Ioctl, BU63165AF_Release, BU63165AF_GetFileName, NULL
+	 AFDRV_BU63165AF, BU63165AF_SetI2Cclient, BU63165AF_Ioctl,
+	 BU63165AF_Release, BU63165AF_GetFileName, NULL
 #else
-	 AFDRV_BU63169AF, BU63169AF_SetI2Cclient, BU63169AF_Ioctl, BU63169AF_Release, BU63169AF_GetFileName, NULL
+	 AFDRV_BU63169AF, BU63169AF_SetI2Cclient, BU63169AF_Ioctl,
+	 BU63169AF_Release, BU63169AF_GetFileName, NULL
 #endif
 	},
 	{1, AFDRV_DW9714AF, DW9714AF_SetI2Cclient, DW9714AF_Ioctl,
@@ -116,8 +125,6 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 LC898212XDAF_Release, LC898212XDAF_GetFileName, NULL},
 	{1, AFDRV_DW9800WAF, DW9800WAF_SetI2Cclient, DW9800WAF_Ioctl,
 	DW9800WAF_Release, DW9800WAF_GetFileName, NULL},
-	{1, AFDRV_FM50AF, FM50AF_SetI2Cclient, FM50AF_Ioctl,
-         FM50AF_Release, FM50AF_GetFileName, NULL},
 	{1, AFDRV_DW9814AF, DW9814AF_SetI2Cclient, DW9814AF_Ioctl,
 	 DW9814AF_Release, DW9814AF_GetFileName, NULL},
 	{1, AFDRV_DW9839AF, DW9839AF_SetI2Cclient, DW9839AF_Ioctl,
@@ -126,8 +133,6 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 FP5510E2AF_Release, FP5510E2AF_GetFileName, NULL},
 	{1, AFDRV_DW9718AF, DW9718AF_SetI2Cclient, DW9718AF_Ioctl,
 	 DW9718AF_Release, DW9718AF_GetFileName, NULL},
-	{1, AFDRV_DW9718GAF, DW9718GAF_SetI2Cclient, DW9718GAF_Ioctl,
-	 DW9718GAF_Release, DW9718GAF_GetFileName, NULL},
 	{1, AFDRV_GT9764AF, GT9764AF_SetI2Cclient, GT9764AF_Ioctl,
 	GT9764AF_Release, GT9764AF_GetFileName, NULL},
 //#ifdef SUPPORT_GT9768AF
@@ -172,8 +177,7 @@ static struct pinctrl *vcamaf_pio;
 static struct pinctrl_state *vcamaf_pio_on;
 static struct pinctrl_state *vcamaf_pio_off;
 
-// #define CAMAF_PMIC     "camaf_m1_pmic"
-#define CAMAF_PMIC     "vldo28"
+#define CAMAF_PMIC     "camaf_m1_pmic"
 #define CAMAF_GPIO_ON  "cam0_ldo_vcamaf_1"
 #define CAMAF_GPIO_OFF "cam0_ldo_vcamaf_0"
 

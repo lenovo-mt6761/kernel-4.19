@@ -50,7 +50,7 @@ static int mtkts_ta_debug_log;
 		}                                   \
 	} while (0)
 
-#define tsta_warn(fmt, args...)  pr_debug("[Thermal/TC/TA]" fmt, ##args)
+#define tsta_warn(fmt, args...)  pr_notice("[Thermal/TC/TA]" fmt, ##args)
 
 /* ************************************ */
 /* Weak functions */
@@ -315,7 +315,7 @@ static void ta_nl_send_to_user(int pid, int seq, struct tad_nl_msg_t *reply_msg)
 	ret = netlink_unicast(daemo_nl_sk, skb, pid, MSG_DONTWAIT);
 	if (ret < 0) {
 		g_ta_status = g_ta_status | 0x00000010;
-		pr_debug("[%s] send failed %d\n", __func__, ret);
+		pr_notice("[%s] send failed %d\n", __func__, ret);
 		return;
 	}
 
@@ -368,7 +368,6 @@ static void ta_nl_data_handler(struct sk_buff *skb)
 
 int wakeup_ta_algo(int flow_state)
 {
-	int tad_pid = g_tad_pid;
 	tsta_dprintk("[%s]g_tad_pid=%d, state=%d\n", __func__, g_tad_pid,
 								flow_state);
 
@@ -379,7 +378,7 @@ int wakeup_ta_algo(int flow_state)
 			tsta_warn("[%s] status: 0x%x\n", __func__, g_ta_status);
 	}
 	g_ta_counter++;
-	if (tad_pid != 0) {
+	if (g_tad_pid != 0) {
 		struct tad_nl_msg_t *tad_msg = NULL;
 		int size = TAD_NL_MSG_T_HDR_LEN + sizeof(flow_state);
 
@@ -395,7 +394,7 @@ int wakeup_ta_algo(int flow_state)
 		tad_msg->tad_cmd = TA_DAEMON_CMD_NOTIFY_DAEMON;
 		memcpy(tad_msg->tad_data, &flow_state, sizeof(flow_state));
 		tad_msg->tad_data_len += sizeof(flow_state);
-		ta_nl_send_to_user(tad_pid, 0, tad_msg);
+		ta_nl_send_to_user(g_tad_pid, 0, tad_msg);
 		kfree(tad_msg);
 		return 0;
 	}

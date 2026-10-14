@@ -24,6 +24,7 @@
 #include "inc/pd_dbg_info.h"
 #include "inc/tcpci.h"
 #include "inc/rt1711h.h"
+#include "inc/cps8851.h"
 
 #ifdef CONFIG_RT_REGMAP
 #include <mt-plat/rt-regmap.h>
@@ -34,6 +35,18 @@
 /* #define DEBUG_GPIO	66 */
 
 #define RT1711H_DRV_VERSION	"2.0.5_MTK"
+
+#define RICHTEK_1711_VID        0x29cf
+#define RICHTEK_1711_PID        0x1711
+#define ET7304_VID              0x6dcf
+#define ET7304_PID              0x1711
+#define HUSB311_VID             0x2e99
+#define HUSB311_PID             0x0311
+#define CPS_8851_VID            0x315c
+#define CPS_8851_PID            0x8851
+
+static u16 chip_vid;
+static u16 chip_pid;
 
 #define RT1711H_IRQ_WAKE_TIME	(500) /* ms */
 
@@ -54,10 +67,12 @@ struct rt1711_chip {
 
 	atomic_t poll_count;
 	struct delayed_work	poll_work;
+	struct delayed_work otp_work;
 
 	int irq_gpio;
 	int irq;
 	int chip_id;
+	int husb311_version;
 };
 
 #ifdef CONFIG_RT_REGMAP
@@ -86,9 +101,9 @@ RT_REG_DECL(TCPC_V10_REG_RX_BUF_FRAME_TYPE, 1, RT_VOLATILE, {});
 RT_REG_DECL(TCPC_V10_REG_RX_HDR, 2, RT_VOLATILE, {});
 RT_REG_DECL(TCPC_V10_REG_RX_DATA, 28, RT_VOLATILE, {});
 RT_REG_DECL(TCPC_V10_REG_TRANSMIT, 1, RT_VOLATILE, {});
-RT_REG_DECL(TCPC_V10_REG_TX_BYTE_CNT, 1, RT_NORMAL_WR_ONCE, {});
-RT_REG_DECL(TCPC_V10_REG_TX_HDR, 2, RT_NORMAL_WR_ONCE, {});
-RT_REG_DECL(TCPC_V10_REG_TX_DATA, 28, RT_NORMAL_WR_ONCE, {});
+RT_REG_DECL(TCPC_V10_REG_TX_BYTE_CNT, 1, RT_VOLATILE, {});
+RT_REG_DECL(TCPC_V10_REG_TX_HDR, 2, RT_VOLATILE, {});
+RT_REG_DECL(TCPC_V10_REG_TX_DATA, 28, RT_VOLATILE, {});
 RT_REG_DECL(RT1711H_REG_CONFIG_GPIO0, 1, RT_NORMAL_WR_ONCE, {});
 RT_REG_DECL(RT1711H_REG_PHY_CTRL1, 1, RT_NORMAL_WR_ONCE, {});
 RT_REG_DECL(RT1711H_REG_CLK_CTRL2, 1, RT_NORMAL_WR_ONCE, {});
@@ -108,6 +123,8 @@ RT_REG_DECL(RT1711H_REG_SWRESET, 1, RT_VOLATILE, {});
 RT_REG_DECL(RT1711H_REG_TTCPC_FILTER, 1, RT_NORMAL_WR_ONCE, {});
 RT_REG_DECL(RT1711H_REG_DRP_TOGGLE_CYCLE, 1, RT_NORMAL_WR_ONCE, {});
 RT_REG_DECL(RT1711H_REG_DRP_DUTY_CTRL, 2, RT_NORMAL_WR_ONCE, {});
+RT_REG_DECL(CPS8851_REG_CP_OTSD, 1, RT_VOLATILE, {});
+RT_REG_DECL(CPS8851_REG_CP_OTSD_MASK, 1, RT_VOLATILE, {});
 RT_REG_DECL(RT1711H_REG_BMCIO_RXDZEN, 1, RT_NORMAL_WR_ONCE, {});
 RT_REG_DECL(RT1711H_REG_UNLOCK_PW_2, 2, RT_VOLATILE, {});
 RT_REG_DECL(RT1711H_REG_EFUSE5, 1, RT_VOLATILE, {});
@@ -160,11 +177,119 @@ static const rt_register_map_t rt1711_chip_regmap[] = {
 	RT_REG(RT1711H_REG_TTCPC_FILTER),
 	RT_REG(RT1711H_REG_DRP_TOGGLE_CYCLE),
 	RT_REG(RT1711H_REG_DRP_DUTY_CTRL),
+	RT_REG(CPS8851_REG_CP_OTSD),
+	RT_REG(CPS8851_REG_CP_OTSD_MASK),
 	RT_REG(RT1711H_REG_BMCIO_RXDZEN),
 	RT_REG(RT1711H_REG_UNLOCK_PW_2),
 	RT_REG(RT1711H_REG_EFUSE5),
 };
 #define RT1711_CHIP_REGMAP_SIZE ARRAY_SIZE(rt1711_chip_regmap)
+
+RT_REG_DECL(HUSB311_TCPC_V10_REG_VID, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_PID, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_DID, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_TYPEC_REV, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_PD_REV, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_PDIF_REV, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_ALERT, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_ALERT_MASK, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_POWER_STATUS_MASK, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_FAULT_STATUS_MASK, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_HUSB311_TCPC_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_ROLE_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_FAULT_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_POWER_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_CC_STATUS, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_POWER_STATUS, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_FAULT_STATUS, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_COMMAND, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_MSG_HDR_INFO, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_RX_DETECT, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_RX_BYTE_CNT, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_RX_BUF_FRAME_TYPE, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_RX_HDR, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_RX_DATA, 28, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_TRANSMIT, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_TX_BYTE_CNT, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_TX_HDR, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_TCPC_V10_REG_TX_DATA, 28, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_CONFIG_GPIO0, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_PHY_CTRL1, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_CLK_CTRL2, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_CLK_CTRL3, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_PRL_FSM_RESET, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_BMC_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_BMCIO_RXDZSEL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_VCONN_CLIMITEN, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_RT_STATUS, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_RT_INT, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_RT_MASK, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_IDLE_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_INTRST_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_WATCHDOG_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_I2CRST_CTRL, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_SWRESET, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_TTCPC_FILTER, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_DRP_TOGGLE_CYCLE, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_DRP_DUTY_CTRL, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_BMCIO_RXDZEN, 1, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_UNLOCK_PW_2, 2, RT_VOLATILE, {});
+RT_REG_DECL(HUSB311_REG_EFUSE5, 1, RT_VOLATILE, {});
+
+static const rt_register_map_t husb311_chip_regmap[] = {
+    RT_REG(HUSB311_TCPC_V10_REG_VID),
+    RT_REG(HUSB311_TCPC_V10_REG_PID),
+    RT_REG(HUSB311_TCPC_V10_REG_DID),
+    RT_REG(HUSB311_TCPC_V10_REG_TYPEC_REV),
+    RT_REG(HUSB311_TCPC_V10_REG_PD_REV),
+    RT_REG(HUSB311_TCPC_V10_REG_PDIF_REV),
+    RT_REG(HUSB311_TCPC_V10_REG_ALERT),
+    RT_REG(HUSB311_TCPC_V10_REG_ALERT_MASK),
+    RT_REG(HUSB311_TCPC_V10_REG_POWER_STATUS_MASK),
+    RT_REG(HUSB311_TCPC_V10_REG_FAULT_STATUS_MASK),
+    RT_REG(HUSB311_TCPC_V10_REG_HUSB311_TCPC_CTRL),
+    RT_REG(HUSB311_TCPC_V10_REG_ROLE_CTRL),
+    RT_REG(HUSB311_TCPC_V10_REG_FAULT_CTRL),
+    RT_REG(HUSB311_TCPC_V10_REG_POWER_CTRL),
+    RT_REG(HUSB311_TCPC_V10_REG_CC_STATUS),
+    RT_REG(HUSB311_TCPC_V10_REG_POWER_STATUS),
+    RT_REG(HUSB311_TCPC_V10_REG_FAULT_STATUS),
+    RT_REG(HUSB311_TCPC_V10_REG_COMMAND),
+    RT_REG(HUSB311_TCPC_V10_REG_MSG_HDR_INFO),
+    RT_REG(HUSB311_TCPC_V10_REG_RX_DETECT),
+    RT_REG(HUSB311_TCPC_V10_REG_RX_BYTE_CNT),
+    RT_REG(HUSB311_TCPC_V10_REG_RX_BUF_FRAME_TYPE),
+    RT_REG(HUSB311_TCPC_V10_REG_RX_HDR),
+    RT_REG(HUSB311_TCPC_V10_REG_RX_DATA),
+    RT_REG(HUSB311_TCPC_V10_REG_TRANSMIT),
+    RT_REG(HUSB311_TCPC_V10_REG_TX_BYTE_CNT),
+    RT_REG(HUSB311_TCPC_V10_REG_TX_HDR),
+    RT_REG(HUSB311_TCPC_V10_REG_TX_DATA),
+    RT_REG(HUSB311_REG_CONFIG_GPIO0),
+    RT_REG(HUSB311_REG_PHY_CTRL1),
+    RT_REG(HUSB311_REG_CLK_CTRL2),
+    RT_REG(HUSB311_REG_CLK_CTRL3),
+    RT_REG(HUSB311_REG_PRL_FSM_RESET),
+    RT_REG(HUSB311_REG_BMC_CTRL),
+    RT_REG(HUSB311_REG_BMCIO_RXDZSEL),
+    RT_REG(HUSB311_REG_VCONN_CLIMITEN),
+    RT_REG(HUSB311_REG_RT_STATUS),
+    RT_REG(HUSB311_REG_RT_INT),
+    RT_REG(HUSB311_REG_RT_MASK),
+    RT_REG(HUSB311_REG_IDLE_CTRL),
+    RT_REG(HUSB311_REG_INTRST_CTRL),
+    RT_REG(HUSB311_REG_WATCHDOG_CTRL),
+    RT_REG(HUSB311_REG_I2CRST_CTRL),
+    RT_REG(HUSB311_REG_SWRESET),
+    RT_REG(HUSB311_REG_TTCPC_FILTER),
+    RT_REG(HUSB311_REG_DRP_TOGGLE_CYCLE),
+    RT_REG(HUSB311_REG_DRP_DUTY_CTRL),
+    RT_REG(HUSB311_REG_BMCIO_RXDZEN),
+    RT_REG(HUSB311_REG_UNLOCK_PW_2),
+    RT_REG(HUSB311_REG_EFUSE5),
+};
+
+#define HUSB311_CHIP_REGMAP_SIZE ARRAY_SIZE(husb311_chip_regmap)
 
 #endif /* CONFIG_RT_REGMAP */
 
@@ -349,6 +474,11 @@ static int rt1711_regmap_init(struct rt1711_chip *chip)
 
 	props->register_num = RT1711_CHIP_REGMAP_SIZE;
 	props->rm = rt1711_chip_regmap;
+
+	if (chip->chip_id == HUSB311_DID) {
+		props->register_num = HUSB311_CHIP_REGMAP_SIZE;
+		props->rm = husb311_chip_regmap;
+	}
 
 	props->rt_regmap_mode = RT_MULTI_BYTE |
 				RT_IO_PASS_THROUGH | RT_DBG_SPECIAL;
@@ -718,13 +848,13 @@ static inline int rt1711h_init_cc_params(
 
 	if (cc_res == TYPEC_CC_VOLT_SNK_DFT) {	/* 0.55 */
 		en = 0;
-		sel = 0x81;
+		sel = 0x41;
 	} else if (chip->chip_id >= RT1715_DID_D) {	/* 0.35 & 0.75 */
 		en = 1;
-		sel = 0x81;
+		sel = 0x41;
 	} else {	/* 0.4 & 0.7 */
 		en = 1;
-		sel = 0x80;
+		sel = 0x40;
 	}
 
 	rv = rt1711_i2c_write8(tcpc, RT1711H_REG_BMCIO_RXDZEN, en);
@@ -751,9 +881,12 @@ static int rt1711_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 	}
 
 #ifdef CONFIG_TCPC_I2CRST_EN
-	rt1711_i2c_write8(tcpc,
+	if ((chip->chip_id == HUSB311_DID) && (chip->husb311_version == HUSB311_B)) {
+	} else {
+		rt1711_i2c_write8(tcpc,
 		RT1711H_REG_I2CRST_CTRL,
 		RT1711H_REG_I2CRST_SET(true, 0x0f));
+	}
 #endif	/* CONFIG_TCPC_I2CRST_EN */
 
 	/* UFP Both RD setting */
@@ -765,6 +898,10 @@ static int rt1711_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 		rt1711_i2c_write8(tcpc, TCPC_V10_REG_FAULT_CTRL,
 			TCPC_V10_REG_FAULT_CTRL_DIS_VCONN_OV);
 	}
+
+	if ((chip_vid == CPS_8851_VID) && (chip_pid == CPS_8851_PID))
+		rt1711_i2c_write8(tcpc, CPS8851_REG_CP_OTSD_MASK,
+			CPS8851_REG_M_OTSD_STATE);
 
 	/*
 	 * CC Detect Debounce : 26.7*val us
@@ -779,7 +916,7 @@ static int rt1711_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 		RT1711H_REG_DRP_DUTY_CTRL, TCPC_NORMAL_RP_DUTY);
 
 	/* Vconn OC */
-	rt1711_i2c_write8(tcpc, RT1711H_REG_VCONN_CLIMITEN, 1);
+	rt1711_i2c_write8(tcpc, RT1711H_REG_VCONN_CLIMITEN, 0);
 
 	/* RX/TX Clock Gating (Auto Mode)*/
 	if (!sw_reset)
@@ -829,6 +966,13 @@ int rt1711_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 	if (status & TCPC_V10_REG_FAULT_STATUS_VCONN_OV)
 		ret = rt1711_fault_status_vconn_ov(tcpc);
 
+	printk("=========hjw1\n");
+	if ((chip_vid == CPS_8851_VID) && (chip_pid == CPS_8851_PID)) {
+		printk("=========hjw2 status = 0x%x, TCPC_V10_REG_FAULT_STATUS_VCONN_OC = 0x%x, TCPC_V10_REG_FAULT_STATUS_VCONN_OV = 0x%x\n", status, TCPC_V10_REG_FAULT_STATUS_VCONN_OC, TCPC_V10_REG_FAULT_STATUS_VCONN_OV);
+		if (status & (TCPC_V10_REG_FAULT_STATUS_VCONN_OC | TCPC_V10_REG_FAULT_STATUS_VCONN_OV))
+			tcpci_set_vconn(tcpc, 0);
+	}
+
 	rt1711_i2c_write8(tcpc, TCPC_V10_REG_FAULT_STATUS, status);
 	return 0;
 }
@@ -864,7 +1008,8 @@ int rt1711_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
 #ifdef CONFIG_TCPC_VSAFE0V_DETECT_IC
 	uint8_t v2;
 #endif
-
+	struct rt1711_chip *chip = tcpc_get_dev_data(tcpc);
+	
 	ret = rt1711_i2c_read16(tcpc, TCPC_V10_REG_ALERT);
 	if (ret < 0)
 		return ret;
@@ -880,6 +1025,16 @@ int rt1711_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
 	*alert |= v2 << 16;
 #endif
 
+	if ((chip_vid == CPS_8851_VID) && (chip_pid == CPS_8851_PID)) {
+		ret = rt1711_i2c_read8(tcpc, CPS8851_REG_CP_OTSD);
+		if(ret < 0)
+			return ret;
+		printk("=========hjw2 CP_OTSD = 0x%x, CPS8851_REG_M_OTSD_STATE = 0x%x\n", ret, CPS8851_REG_M_OTSD_STATE);
+		if (ret) {
+			rt1711_i2c_write8(tcpc, CPS8851_REG_CP_OTSD_MASK, 0);
+			schedule_delayed_work(&chip->otp_work, msecs_to_jiffies(50));
+		}
+	}
 	return 0;
 }
 
@@ -1063,6 +1218,7 @@ static int rt1711_set_vconn(struct tcpc_device *tcpc, int enable)
 {
 	int rv;
 	int data;
+	struct rt1711_chip *chip = tcpc_get_dev_data(tcpc);
 
 	data = rt1711_i2c_read8(tcpc, TCPC_V10_REG_POWER_CTRL);
 	if (data < 0)
@@ -1070,6 +1226,12 @@ static int rt1711_set_vconn(struct tcpc_device *tcpc, int enable)
 
 	data &= ~TCPC_V10_REG_POWER_CTRL_VCONN;
 	data |= enable ? TCPC_V10_REG_POWER_CTRL_VCONN : 0;
+
+	if ((chip->chip_id == HUSB311_DID) && (chip->husb311_version == HUSB311_B)) {
+		data &= ~TCPC_V10_REG_POWER_CTRL_VCONN;
+		pr_info("%s - write 0x%x to HUSB311_POWER_CTRL_VCONNL, off vconn\n",
+				__func__, data);
+	}
 
 	rv = rt1711_i2c_write8(tcpc, TCPC_V10_REG_POWER_CTRL, data);
 	if (rv < 0)
@@ -1082,10 +1244,17 @@ static int rt1711_set_vconn(struct tcpc_device *tcpc, int enable)
 #ifdef CONFIG_TCPC_LOW_POWER_MODE
 static int rt1711_is_low_power_mode(struct tcpc_device *tcpc)
 {
-	int rv = rt1711_i2c_read8(tcpc, RT1711H_REG_BMC_CTRL);
+	int rv;
+	struct rt1711_chip *chip = tcpc_get_dev_data(tcpc);
 
+	rv = rt1711_i2c_read8(tcpc, RT1711H_REG_BMC_CTRL);
 	if (rv < 0)
 		return rv;
+
+	if (chip->chip_id == HUSB311_DID) {
+		pr_info("%s - read 0x90=0x%x\n", __func__, rv);
+		return ((rv & RT1711H_REG_BMCIO_OSC_EN) == 0);
+	}
 
 	return (rv & RT1711H_REG_BMCIO_LPEN) != 0;
 }
@@ -1095,6 +1264,7 @@ static int rt1711_set_low_power_mode(
 {
 	int ret = 0;
 	uint8_t data;
+	struct rt1711_chip *chip = tcpc_get_dev_data(tcpc);
 
 	ret = rt1711_i2c_write8(tcpc, RT1711H_REG_IDLE_CTRL,
 		RT1711H_REG_IDLE_SET(0, 1, en ? 0 : 1, 0));
@@ -1112,9 +1282,19 @@ static int rt1711_set_low_power_mode(
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
 		data |= RT1711H_REG_BMCIO_BG_EN | RT1711H_REG_VBUS_DET_EN;
 #endif
+		if (chip->chip_id == HUSB311_DID) {
+			data &= ~RT1711H_REG_BMCIO_OSC_EN;
+			pr_info("%s - write HUSB311_REG_BMC_CTRL=0x%x\n",
+					__func__, data);
+		}
 	} else {
 		data = RT1711H_REG_BMCIO_BG_EN |
 			RT1711H_REG_VBUS_DET_EN | RT1711H_REG_BMCIO_OSC_EN;
+		if (chip->chip_id == HUSB311_DID) {
+			data |= RT1711H_REG_BMCIO_OSC_EN;
+			pr_info("%s - write HUSB311_REG_BMC_CTRL=0x%x\n",
+					__func__, data);
+		}
 	}
 
 	return rt1711_i2c_write8(tcpc, RT1711H_REG_BMC_CTRL, data);
@@ -1149,9 +1329,18 @@ static int rt1711_tcpc_deinit(struct tcpc_device *tcpc)
 	rt1711_set_cc(tcpc, TYPEC_CC_DRP);
 	rt1711_set_cc(tcpc, TYPEC_CC_OPEN);
 
-	rt1711_i2c_write8(tcpc,
-		RT1711H_REG_I2CRST_CTRL,
-		RT1711H_REG_I2CRST_SET(true, 4));
+	if (chip->chip_id == HUSB311_DID) {
+		tcpci_alert_status_clear(tcpc, 0xffffff);//0x10 0x11 0x98
+
+		rt1711_write_word(chip->client, TCPC_V10_REG_ALERT_MASK, 0x0); //0x12 0x13
+		rt1711_i2c_write8(tcpc, TCPC_V10_REG_POWER_STATUS_MASK, 0x0); //0x14
+		rt1711_i2c_write8(tcpc, RT1711H_REG_RT_MASK, 0x0); //0x99
+		rt1711_i2c_write8(tcpc, RT1711H_REG_BMC_CTRL, 0x0); //0x90
+	} else {
+		rt1711_i2c_write8(tcpc,
+				RT1711H_REG_I2CRST_CTRL,
+				RT1711H_REG_I2CRST_SET(true, 4));
+	}
 
 	rt1711_i2c_write8(tcpc,
 		RT1711H_REG_INTRST_CTRL,
@@ -1354,9 +1543,9 @@ static int rt_parse_dt(struct rt1711_chip *chip, struct device *dev)
 
 	pr_info("%s\n", __func__);
 
-	np = of_find_node_by_name(NULL, "rt1711_type_c_port0");
+	np = of_find_node_by_name(NULL, "usb_type_c");
 	if (!np) {
-		pr_notice("%s find node rt1711_type_c_port0 fail\n", __func__);
+		pr_notice("%s find node usb_type_c fail\n", __func__);
 		return -ENODEV;
 	}
 	dev->of_node = np;
@@ -1502,7 +1691,7 @@ static int rt1711_tcpcdev_init(struct rt1711_chip *chip, struct device *dev)
 	chip->tcpc->tcpc_flags = TCPC_FLAGS_LPM_WAKEUP_WATCHDOG |
 			TCPC_FLAGS_VCONN_SAFE5V_ONLY;
 
-	if (chip->chip_id > RT1711H_DID_B)
+	if ((chip->chip_id > RT1711H_DID_B) || (chip->chip_id == HUSB311_DID))
 		chip->tcpc->tcpc_flags |= TCPC_FLAGS_CHECK_RA_DETACHE;
 
 #ifdef CONFIG_USB_PD_RETRY_CRC_DISCARD
@@ -1511,7 +1700,7 @@ static int rt1711_tcpcdev_init(struct rt1711_chip *chip, struct device *dev)
 #endif  /* CONFIG_USB_PD_RETRY_CRC_DISCARD */
 
 #ifdef CONFIG_USB_PD_REV30
-	if (chip->chip_id >= RT1715_DID_D)
+	if ((chip->chip_id >= RT1715_DID_D) || (chip->chip_id == HUSB311_DID))
 		chip->tcpc->tcpc_flags |= TCPC_FLAGS_PD_REV30;
 
 	if (chip->tcpc->tcpc_flags & TCPC_FLAGS_PD_REV30)
@@ -1523,9 +1712,6 @@ static int rt1711_tcpcdev_init(struct rt1711_chip *chip, struct device *dev)
 
 	return 0;
 }
-
-#define RICHTEK_1711_VID	0x29cf
-#define RICHTEK_1711_PID	0x1711
 
 static inline int rt1711h_check_revision(struct i2c_client *client)
 {
@@ -1539,7 +1725,8 @@ static inline int rt1711h_check_revision(struct i2c_client *client)
 		return -EIO;
 	}
 
-	if (vid != RICHTEK_1711_VID) {
+	if ((vid != RICHTEK_1711_VID) && (vid != ET7304_VID)
+			&& (vid != HUSB311_VID) && (vid != CPS_8851_VID)) {
 		pr_info("%s failed, VID=0x%04x\n", __func__, vid);
 		return -ENODEV;
 	}
@@ -1550,10 +1737,15 @@ static inline int rt1711h_check_revision(struct i2c_client *client)
 		return -EIO;
 	}
 
-	if (pid != RICHTEK_1711_PID) {
+	pr_info("%s: vid=0x%x, pid=0x%x\n", __func__, vid, pid);
+	if ((pid != RICHTEK_1711_PID) && (pid != HUSB311_PID)
+			&& (pid != ET7304_PID) && (pid != CPS_8851_PID)) {
 		pr_info("%s failed, PID=0x%04x\n", __func__, pid);
 		return -ENODEV;
 	}
+
+	chip_vid = vid;
+	chip_pid = pid;
 
 	ret = rt1711_write_device(client, RT1711H_REG_SWRESET, 1, &data);
 	if (ret < 0)
@@ -1570,12 +1762,27 @@ static inline int rt1711h_check_revision(struct i2c_client *client)
 	return did;
 }
 
+static void cps8851_otp_work(struct work_struct *work)
+{
+	struct rt1711_chip *chip = container_of(
+		work, struct rt1711_chip, otp_work.work);
+	
+	printk("=========hjw2 %s clear otsd state\n", __func__);
+	tcpci_lock_typec(chip->tcpc);
+	tcpci_set_vconn(chip->tcpc, 0);
+	rt1711_i2c_write8(chip->tcpc, CPS8851_REG_CP_OTSD, CPS8851_REG_OTSD_STATE);
+	rt1711_i2c_write8(chip->tcpc, CPS8851_REG_CP_OTSD_MASK,
+		CPS8851_REG_M_OTSD_STATE);
+	tcpci_unlock_typec(chip->tcpc);
+}
+
 static int rt1711_i2c_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
 {
 	struct rt1711_chip *chip;
 	int ret = 0, chip_id;
 	bool use_dt = client->dev.of_node;
+	u8 version;
 
 	pr_info("%s (%s)\n", __func__, RT1711H_DRV_VERSION);
 	if (i2c_check_functionality(client->adapter,
@@ -1610,11 +1817,28 @@ static int rt1711_i2c_probe(struct i2c_client *client,
 	sema_init(&chip->suspend_lock, 1);
 	i2c_set_clientdata(client, chip);
 	INIT_DELAYED_WORK(&chip->poll_work, rt1711_poll_work);
+	INIT_DELAYED_WORK(&chip->otp_work, cps8851_otp_work);
+
 	chip->irq_wake_lock =
 		wakeup_source_register(chip->dev, "rt1711h_irq_wake_lock");
 
 	chip->chip_id = chip_id;
 	pr_info("rt1711h_chipID = 0x%0x\n", chip_id);
+
+	if (chip_id == HUSB311_DID) {
+		ret = rt1711_read_device(client, HUSB311_REG_CF, 1, &version);
+		if (ret < 0) {
+			dev_err(&client->dev, "read 0xcf fail(%d)\n", ret);
+			return -EIO;
+		}
+		if (version & BIT(7)) {
+			chip->husb311_version = HUSB311_B;
+			pr_info("%s:version=0x%x,311B\n", __func__, version);
+		} else {
+			chip->husb311_version = HUSB311_C;
+			pr_info("%s:version=0x%x,311C\n", __func__, version);
+		}
+	}
 
 	ret = rt1711_regmap_init(chip);
 	if (ret < 0) {

@@ -3,6 +3,8 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 
+#define DEBUG
+
 #define pr_fmt(fmt) "<ALS/PS> " fmt
 
 #include "inc/alsps.h"
@@ -16,7 +18,7 @@ int last_als_report_data = -1;
 
 static struct alsps_init_info *alsps_init_list[MAX_CHOOSE_ALSPS_NUM] = {0};
 
-int als_data_report_t(int value, int status, int64_t time_stamp)
+int als_data_report_t(int* value, int status, int64_t time_stamp)
 {
 	int err = 0;
 	struct alsps_context *cxt = NULL;
@@ -31,22 +33,25 @@ int als_data_report_t(int value, int status, int64_t time_stamp)
 	if (cxt->is_get_valid_als_data_after_enable == false) {
 		event.handle = ID_LIGHT;
 		event.flush_action = DATA_ACTION;
-		event.word[0] = value + 1;
+		event.word[0] = value[0] + 1;
 		err = sensor_input_event(cxt->als_mdev.minor, &event);
 		cxt->is_get_valid_als_data_after_enable = true;
 	}
-	if (value != last_als_report_data) {
+	if (value[0] != last_als_report_data) {
 		event.handle = ID_LIGHT;
 		event.flush_action = DATA_ACTION;
-		event.word[0] = value;
+		event.word[0] = value[0];
+		event.word[1] = value[1];
+		event.word[2] = value[2];
 		event.status = status;
+		pr_debug("value[0]=%d,value[1]=%d,value[2]=%d\n", value[0], value[1],value[2]);
 		err = sensor_input_event(cxt->als_mdev.minor, &event);
 		if (err >= 0)
-			last_als_report_data = value;
+			last_als_report_data = value[0];
 	}
 	return err;
 }
-int als_data_report(int value, int status)
+int als_data_report(int* value, int status)
 {
 	return als_data_report_t(value, status, 0);
 }
@@ -58,10 +63,26 @@ int als_cali_report(int *value)
 	memset(&event, 0, sizeof(struct sensor_event));
 	event.handle = ID_LIGHT;
 	event.flush_action = CALI_ACTION;
-	event.word[0] = value[0];
+    event.word[0] = value[0];
+    event.word[1] = 0;
 	err = sensor_input_event(alsps_context_obj->als_mdev.minor, &event);
 	return err;
 }
+
+int als_offset_report(int32_t value[2])
+{
+	int err = 0;
+	struct sensor_event event;
+
+	memset(&event, 0, sizeof(struct sensor_event));
+	event.handle = ID_LIGHT;
+	event.flush_action = CALI_ACTION;
+    event.word[0] = value[0];
+    event.word[1] = value[1];
+	err = sensor_input_event(alsps_context_obj->als_mdev.minor, &event);
+	return err;
+}
+
 
 int als_flush_report(void)
 {
@@ -161,7 +182,7 @@ int ps_flush_report(void)
 static void als_work_func(struct work_struct *work)
 {
 	struct alsps_context *cxt = NULL;
-	int value, status;
+	int value[3], status;
 	int64_t nt;
 	struct timespec time;
 	int err;
@@ -176,12 +197,14 @@ static void als_work_func(struct work_struct *work)
 	time = get_monotonic_coarse();
 	nt = time.tv_sec * 1000000000LL + time.tv_nsec;
 	/* add wake lock to make sure data can be read before system suspend */
-	err = cxt->als_data.get_data(&value, &status);
+	err = cxt->als_data.get_data(value, &status);
 	if (err) {
 		pr_err("get alsps data fails!!\n");
 		goto als_loop;
 	} else {
-		cxt->drv_data.als_data.values[0] = value;
+		cxt->drv_data.als_data.values[0] = value[0];
+		cxt->drv_data.als_data.values[1] = value[1];
+		cxt->drv_data.als_data.values[2] = value[2];
 		cxt->drv_data.als_data.status = status;
 		cxt->drv_data.als_data.time = nt;
 	}
@@ -195,7 +218,7 @@ static void als_work_func(struct work_struct *work)
 		}
 	}
 	/* pr_debug(" als data[%d]\n" , cxt->drv_data.als_data.values[0]); */
-	als_data_report(cxt->drv_data.als_data.values[0],
+	als_data_report(cxt->drv_data.als_data.values,
 			cxt->drv_data.als_data.status);
 
 als_loop:
@@ -322,7 +345,8 @@ static struct alsps_context *alsps_context_alloc_object(void)
 	return obj;
 }
 
-#if !defined(CONFIG_NANOHUB) || !defined(CONFIG_MTK_ALSPSHUB)
+//#if !defined(CONFIG_NANOHUB) || !defined(CONFIG_MTK_ALSPSHUB)
+#if !defined(CONFIG_MTK_ALSPSHUB)
 static int als_enable_and_batch(void)
 {
 	struct alsps_context *cxt = alsps_context_obj;
@@ -388,8 +412,8 @@ static int als_enable_and_batch(void)
 
 			do_div(mdelay, 1000000);
 			/* defaut max polling delay */
-			if (mdelay < 10)
-				mdelay = 10;
+			if (mdelay < 200)
+				mdelay = 200;
 			atomic_set(&cxt->delay_als, mdelay);
 			/* the first sensor start polling timer */
 			if (cxt->is_als_polling_run == false) {
@@ -435,7 +459,8 @@ static ssize_t alsactive_store(struct device *dev,
 			err = -1;
 			goto err_out;
 		}
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 		if (cxt->als_enable) {
 			err = cxt->als_ctl.enable_nodata(cxt->als_enable);
 			if (err) {
@@ -462,7 +487,8 @@ static ssize_t alsactive_store(struct device *dev,
 			err = -1;
 			goto err_out;
 		}
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 		if (cxt->rgbw_enable) {
 			err = cxt->als_ctl.rgbw_enable(cxt->rgbw_enable);
 			if (err) {
@@ -519,7 +545,8 @@ static ssize_t alsbatch_store(struct device *dev,
 
 	mutex_lock(&alsps_context_obj->alsps_op_mutex);
 	if (handle == ID_LIGHT) {
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 		if (cxt->als_ctl.is_support_batch)
 			err = cxt->als_ctl.batch(0, cxt->als_delay_ns,
 				cxt->als_latency_ns);
@@ -531,7 +558,8 @@ static ssize_t alsbatch_store(struct device *dev,
 	} else if (handle == ID_RGBW) {
 		cxt->rgbw_delay_ns = delay_ns;
 		cxt->rgbw_latency_ns = latency_ns;
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 		if (cxt->als_ctl.is_support_batch)
 			err = cxt->als_ctl.rgbw_batch(0, cxt->rgbw_delay_ns,
 				cxt->rgbw_latency_ns);
@@ -623,8 +651,34 @@ static ssize_t alscali_store(struct device *dev,
 	vfree(cali_buf);
 	return count;
 }
+static ssize_t alsoffset_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct alsps_context *cxt = NULL;
+	int err = 0;
+	uint8_t *offset_buf = NULL;
+	offset_buf = vzalloc(count);
+	if (!offset_buf){
+        pr_err("alsoffset_store ENOMEM\n");
+        return -ENOMEM;
+    }
+	memcpy(offset_buf, buf, count);
+	mutex_lock(&alsps_context_obj->alsps_op_mutex);
+	cxt = alsps_context_obj;
+	if (cxt->als_ctl.set_offset != NULL){
+		err = cxt->als_ctl.set_offset(offset_buf, count);
+    }else{
+        pr_err("alsoffset_store = NULL\n");
+    }
+	if (err < 0)
+		pr_err("als set als offset err %d\n", err);
+	mutex_unlock(&alsps_context_obj->alsps_op_mutex);
+	vfree(offset_buf);
+	return count;
+}
 
-#if !defined(CONFIG_NANOHUB) || !defined(CONFIG_MTK_ALSPSHUB)
+//#if !defined(CONFIG_NANOHUB) || !defined(CONFIG_MTK_ALSPSHUB)
+#if !defined(CONFIG_MTK_ALSPSHUB)
 static int ps_enable_and_batch(void)
 {
 	struct alsps_context *cxt = alsps_context_obj;
@@ -727,7 +781,8 @@ static ssize_t psactive_store(struct device *dev,
 		err = -1;
 		goto err_out;
 	}
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 	err = cxt->ps_ctl.enable_nodata(cxt->ps_enable);
 #else
 	err = ps_enable_and_batch();
@@ -768,7 +823,8 @@ static ssize_t psbatch_store(struct device *dev, struct device_attribute *attr,
 	}
 
 	mutex_lock(&alsps_context_obj->alsps_op_mutex);
-#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+//#if defined(CONFIG_NANOHUB) && defined(CONFIG_MTK_ALSPSHUB)
+#if defined(CONFIG_MTK_ALSPSHUB)
 	if (cxt->ps_ctl.is_support_batch)
 		err = cxt->ps_ctl.batch(0, cxt->ps_delay_ns,
 					cxt->ps_latency_ns);
@@ -981,6 +1037,7 @@ DEVICE_ATTR_RW(alsbatch);
 DEVICE_ATTR_RW(alsflush);
 DEVICE_ATTR_RO(alsdevnum);
 DEVICE_ATTR_WO(alscali);
+DEVICE_ATTR_WO(alsoffset);
 DEVICE_ATTR_RW(psactive);
 DEVICE_ATTR_RW(psbatch);
 DEVICE_ATTR_RW(psflush);
@@ -993,6 +1050,7 @@ static struct attribute *als_attributes[] = {
 	&dev_attr_alsflush.attr,
 	&dev_attr_alsdevnum.attr,
 	&dev_attr_alscali.attr,
+	&dev_attr_alsoffset.attr,
 	NULL
 };
 
@@ -1143,6 +1201,7 @@ int als_register_control_path(struct als_control_path *ctl)
 	cxt->als_ctl.batch = ctl->batch;
 	cxt->als_ctl.flush = ctl->flush;
 	cxt->als_ctl.set_cali = ctl->set_cali;
+	cxt->als_ctl.set_offset = ctl->set_offset;
 	cxt->als_ctl.rgbw_enable = ctl->rgbw_enable;
 	cxt->als_ctl.rgbw_batch = ctl->rgbw_batch;
 	cxt->als_ctl.rgbw_flush = ctl->rgbw_flush;

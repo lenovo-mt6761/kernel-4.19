@@ -3114,10 +3114,7 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 			DBG(0, "ret<%d>\n", ret);
 	}
 
-	if (strstr(current->comm, "usb_call"))
-		DBG_LIMIT(5, "%s", info);
-	else
-		DBG(0, "%s\n", info);
+	DBG_LIMIT(5, "%s", info);
 
 #ifdef CONFIG_MTK_MUSB_QMU_SUPPORT
 	/* abort HW transaction on this ep */
@@ -3172,7 +3169,7 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 #endif
 			if (qh->type != USB_ENDPOINT_XFER_CONTROL) {
 				DBG(0, "why here, this is ring case?\n");
-				musb_bug();
+				dump_stack();
 			}
 
 			qh->hep->hcpriv = NULL;
@@ -3358,6 +3355,11 @@ static int musb_bus_suspend(struct usb_hcd *hcd)
 {
 	struct musb *musb = hcd_to_musb(hcd);
 	u8 devctl;
+	int ret;
+
+	ret = musb_port_suspend(musb, true);
+	if (ret)
+		return ret;
 
 	if (!is_host_active(musb))
 		return 0;
@@ -3396,8 +3398,10 @@ static int musb_bus_resume(struct usb_hcd *hcd)
 {
 	struct musb *musb = hcd_to_musb(hcd);
 
-	if (is_host_active(musb))
-		usb_hal_dpidle_request(USB_DPIDLE_FORBIDDEN);
+	if (!is_host_active(musb))
+		return 0;
+
+	usb_hal_dpidle_request(USB_DPIDLE_FORBIDDEN);
 
 	/* resuming child port does the work */
 	return 0;

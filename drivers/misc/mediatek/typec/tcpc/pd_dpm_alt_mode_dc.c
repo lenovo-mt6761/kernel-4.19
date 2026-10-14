@@ -514,7 +514,7 @@ bool dc_ufp_notify_uvdm(struct pd_port *pd_port,
 	uint32_t reply_cmd[3];
 	uint32_t recv_code[2], rn_code, pass_code;
 
-	reply_cmd[0] = PD_UVDM_HDR(0x29cf, RTDC_UVDM_EN_UNLOCK);
+	reply_cmd[0] = PD_UVDM_HDR(0x6dcf, RTDC_UVDM_EN_UNLOCK);
 	uint32_t cmd = PD_UVDM_HDR_CMD(pd_port->uvdm_data[0]);
 
 	if (cmd != RTDC_UVDM_EN_UNLOCK) {

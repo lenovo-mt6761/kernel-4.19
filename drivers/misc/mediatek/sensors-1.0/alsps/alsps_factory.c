@@ -35,6 +35,7 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 	uint32_t enable = 0;
 	int threshold_data[2] = {0, 0};
 	int als_cali = 0;
+    int als_offset = 0;
 
 	if (_IOC_DIR(cmd) & _IOC_READ)
 		err = !access_ok(VERIFY_WRITE, (void __user *)arg,
@@ -119,6 +120,23 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			return -EINVAL;
 		}
 		return 0;
+	case ALSPS_GET_ALS_DATA:
+    	if (alsps_factory.fops != NULL &&
+    	    alsps_factory.fops->als_get_data != NULL) {
+    	    err = alsps_factory.fops->als_get_data(&data);
+    	    if (err < 0) {
+    	        pr_err(
+    	            "ALSPS_GET_ALS_DATA read data fail!\n");
+    	        return -EINVAL;
+    	    }
+    	    if (copy_to_user(ptr, &data, sizeof(data)))
+    	        return -EFAULT;
+    	} else {
+    	    pr_err("ALSPS_GET_ALS_DATA NULL\n");
+    	    return -EINVAL;
+    	}
+    	return 0;
+
 	case ALSPS_ALS_ENABLE_CALI:
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->als_enable_calibration != NULL) {
@@ -129,6 +147,21 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			}
 		} else {
 			pr_err("ALSPS_ALS_ENABLE_CALI NULL\n");
+			return -EINVAL;
+		}
+		return 0;
+	case ALSPS_ALS_IOCTL_CLR_CALI:
+		if (copy_from_user(&als_cali, ptr, sizeof(als_cali)))
+			return -EFAULT;
+		if (alsps_factory.fops != NULL &&
+			alsps_factory.fops->als_clear_cali != NULL) {
+			err = alsps_factory.fops->als_clear_cali();
+			if (err < 0) {
+				pr_err("ALSPS_ALS_IOCTL_CLR_CALI FAIL!\n");
+				return -EINVAL;
+			}
+		} else {
+			pr_err("ALSPS_ALS_IOCTL_CLR_CALI NULL\n");
 			return -EINVAL;
 		}
 		return 0;
@@ -147,6 +180,53 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			return -EINVAL;
 		}
 		return 0;
+	case ALSPS_ALS_SET_OFFSET:
+		if (copy_from_user(&als_offset, ptr, sizeof(als_offset)))
+			return -EFAULT;
+		if (alsps_factory.fops != NULL &&
+			alsps_factory.fops->als_set_offset != NULL) {
+			err = alsps_factory.fops->als_set_offset(als_offset);
+			if (err < 0) {
+				pr_err("ALSPS_ALS_SET_OFFSET FAIL!\n");
+				return -EINVAL;
+			}
+		} else {
+			pr_err("ALSPS_ALS_SET_OFFSET NULL\n");
+			return -EINVAL;
+		}
+		return 0;
+	case ALSPS_ALS_GET_OFFSET:
+		if (alsps_factory.fops != NULL &&
+			alsps_factory.fops->als_get_offset != NULL) {
+			err = alsps_factory.fops->als_get_offset(&als_offset);
+			if (err < 0) {
+				pr_err(
+					"ALSPS_ALS_GET_OFFSET read data fail!\n");
+				return -EINVAL;
+			}
+			if (copy_to_user(ptr, &data, sizeof(als_offset)))
+				return -EFAULT;
+		} else {
+			pr_err("ALSPS_ALS_GET_OFFSET NULL\n");
+			return -EINVAL;
+		}
+		return 0;
+	case ALSPS_ALS_CLR_OFFSET:
+		if (copy_from_user(&als_offset, ptr, sizeof(als_offset)))
+			return -EFAULT;
+		if (alsps_factory.fops != NULL &&
+			alsps_factory.fops->als_clear_offset != NULL) {
+			err = alsps_factory.fops->als_clear_offset();
+			if (err < 0) {
+				pr_err("ALSPS_ALS_CLR_OFFSET FAIL!\n");
+ 				return -EINVAL;
+			}
+		} else {
+			pr_err("ALSPS_ALS_CLR_OFFSET NULL\n");
+			return -EINVAL;
+		}
+		return 0;
+
 	case ALSPS_GET_PS_TEST_RESULT:
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->ps_get_data != NULL) {

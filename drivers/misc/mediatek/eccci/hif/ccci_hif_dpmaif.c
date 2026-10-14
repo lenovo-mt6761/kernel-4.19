@@ -450,7 +450,7 @@ static void dump_drb_queue_data(unsigned int qno)
 	i = 0;
 	while (i < count) {
 		DPMA_DRB_DATA_INFO("%08X(%04d): %016llX %016llX %016llX %016llX %016llX %016llX %016llX %016llX\n",
-			(long)data_64ptr, (i * 8),
+			(u32)data_64ptr, (i * 8),
 			*data_64ptr, *(data_64ptr + 1),
 			*(data_64ptr + 2), *(data_64ptr + 3),
 			*(data_64ptr + 4), *(data_64ptr + 5),
@@ -463,7 +463,7 @@ static void dump_drb_queue_data(unsigned int qno)
 	if (mod64 > 0) {
 		data_8ptr = (u8 *)data_64ptr;
 
-		DPMA_DRB_DATA_INFO("%08X(%04d):", (long)data_8ptr, count * 8);
+		DPMA_DRB_DATA_INFO("%08X(%04d):", (u32)data_8ptr, count * 8);
 
 		for (i = 0; i < mod64; i++) {
 			if ((i % 8) == 0)
@@ -633,7 +633,6 @@ struct ul_update_rec {
 	unsigned int r_id;
 	unsigned int rel_id;
 	unsigned int budget;
-	unsigned int hw_reg_before;
 	unsigned int hw_reg;
 	unsigned int add_rel;
 };
@@ -651,8 +650,7 @@ static unsigned int s_rel_drb_rec_curr[DPMAIF_TXQ_NUM];
 
 static void ul_add_wcnt_record(int qid, unsigned int cnt, int ret,
 				unsigned int w, unsigned int r,
-				unsigned int rel, unsigned int b,
-				unsigned int hw_reg_b)
+				unsigned int rel, unsigned int b)
 {
 	struct ul_update_rec *ptr;
 
@@ -666,7 +664,6 @@ static void ul_add_wcnt_record(int qid, unsigned int cnt, int ret,
 	ptr->r_id = r;
 	ptr->rel_id = rel;
 	ptr->budget = b;
-	ptr->hw_reg_before = hw_reg_b;
 	ptr->hw_reg = drv_dpmaif_ul_get_rwidx(qid);
 	ptr->add_rel = 0;
 
@@ -692,7 +689,6 @@ static void ul_rel_drb_record(int qid, unsigned int w, unsigned int r,
 	ptr->r_id = r;
 	ptr->rel_id = rel;
 	ptr->budget = b;
-	ptr->hw_reg_before = 0;
 	ptr->hw_reg = drv_dpmaif_ul_get_rwidx(qid);
 	ptr->add_rel = 1;
 
@@ -747,27 +743,27 @@ static void dump_drb_record_by_que(unsigned int qno)
 						a = 0;
 				}
 				DPMA_DRB_LOG(
-					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg_before:0x%x reg:0x%x f:%d\n",
+					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg:0x%x f:%d\n",
 					ptr->tick, ptr->ret, ptr->add_cnt,
 					ptr->w_id, ptr->r_id, ptr->r_id << 1,
-					ptr->rel_id, ptr->budget,
-					ptr->hw_reg_before, ptr->hw_reg, ptr->add_rel);
+					ptr->rel_id, ptr->budget, ptr->hw_reg,
+					ptr->add_rel);
 			} else if (n) {
 				ptr = &s_add_drb_history[qno][a];
 				DPMA_DRB_LOG(
-					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg_before:0x%x reg:0x%x f:%d\n",
+					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg:0x%x f:%d\n",
 					ptr->tick, ptr->ret, ptr->add_cnt,
 					ptr->w_id, ptr->r_id, ptr->r_id << 1,
-					ptr->rel_id, ptr->budget,
-					ptr->hw_reg_before, ptr->hw_reg, ptr->add_rel);
+					ptr->rel_id, ptr->budget, ptr->hw_reg,
+					ptr->add_rel);
 			} else {
 				ptr = &s_rel_drb_history[qno][r];
 				DPMA_DRB_LOG(
-					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg_before:0x%x reg:0x%x f:%d\n",
+					"[%lld] ret:%d ac:%u w:%u r:%u(0x%x) rel:%u b:%u reg:0x%x f:%d\n",
 					ptr->tick, ptr->ret, ptr->add_cnt,
 					ptr->w_id, ptr->r_id, ptr->r_id << 1,
-					ptr->rel_id, ptr->budget,
-					ptr->hw_reg_before, ptr->hw_reg, ptr->add_rel);
+					ptr->rel_id, ptr->budget, ptr->hw_reg,
+					ptr->add_rel);
 			}
 		}
 	}
@@ -927,7 +923,7 @@ static int dpmaif_net_rx_push_thread(void *arg)
 		skb = ccci_skb_dequeue(&queue->skb_list);
 		if (!skb)
 			continue;
-#if defined(MT6297) && defined(CONFIG_MTK_ECCCI_NET_SPEED_MONITOR)
+#ifdef MT6297
 		mtk_ccci_add_dl_pkt_size(skb->len);
 #endif
 #ifndef CCCI_KMODULE_ENABLE
@@ -2544,14 +2540,6 @@ int dpmaif_tx_done_kernel_thread(void *arg)
 				__func__, txq->index);
 			continue;
 		}
-
-		if (dpmaif_wait_resume_done()) {
-			//if resume not done, will waiting 1ms
-			hrtimer_start(&txq->tx_done_timer,
-				ktime_set(0, 1000000), HRTIMER_MODE_REL);
-			continue;
-		}
-
 		if (atomic_read(&txq->tx_resume_done)) {
 			CCCI_ERROR_LOG(dpmaif_ctrl->md_id, TAG,
 				"txq%d done/resume: 0x%x, 0x%x, 0x%x\n",
@@ -2859,7 +2847,6 @@ static int dpmaif_tx_send_skb(unsigned char hif_id, int qno,
 	int total_size = 0;
 #endif
 	short cs_ipv4 = 0, cs_l4 = 0;
-	unsigned int hw_reg_before = 0;
 
 	/* 1. parameters check*/
 	if (!skb)
@@ -3105,19 +3092,18 @@ retry:
 			drv_dpmaif_ul_get_rwidx(3));
 		atomic_set(&txq->tx_resume_tx, 0);
 	}
-
-	hw_reg_before = drv_dpmaif_ul_get_rwidx(txq->index);
 	ret = drv_dpmaif_ul_add_wcnt(txq->index,
 		send_cnt * DPMAIF_UL_DRB_ENTRY_WORD);
 	ul_add_wcnt_record(txq->index, send_cnt * DPMAIF_UL_DRB_ENTRY_WORD,
-			ret, txq->drb_wr_idx, txq->drb_rd_idx, txq->drb_rel_rd_idx,
-			atomic_read(&txq->tx_budget), hw_reg_before);
+			ret, txq->drb_wr_idx, txq->drb_rd_idx,
+			txq->drb_rel_rd_idx,
+			atomic_read(&txq->tx_budget));
 
 	if (ret == HW_REG_CHK_FAIL) {
 		tx_force_md_assert("HW_REG_CHK_FAIL");
 		ret = 0;
 	}
-#if defined(MT6297) && defined(CONFIG_MTK_ECCCI_NET_SPEED_MONITOR)
+#ifdef MT6297
 	if (ret == 0)
 		mtk_ccci_add_ul_pkt_size(total_size);
 #endif
@@ -4808,7 +4794,7 @@ int ccci_dpmaif_hif_init(struct device *dev)
 		&ccci_hif_dpmaif_ops);
 	register_syscore_ops(&dpmaif_sysops);
 
-#if defined(MT6297) && defined(CONFIG_MTK_ECCCI_NET_SPEED_MONITOR)
+#ifdef MT6297
 	mtk_ccci_speed_monitor_init();
 #endif
 	atomic_set(&dpmaif_ctrl->suspend_flag, 0);

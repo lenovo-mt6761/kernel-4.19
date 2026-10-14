@@ -7,6 +7,12 @@ config MTK_LCM
 	  Please make sure CONFIG_MTK_LCM in xxxxxx_defconfig.mk.
 	  And also make sure true on in ProjectConfig.mk
 
+config LCM_SET_BACKLIGHT
+	bool "Enable LCM Set Backlight"
+	default n
+	help
+	  define LCM control backlight
+
 config CUSTOM_KERNEL_LCM
 	string "define mediatek kernel LCM driver"
 	help

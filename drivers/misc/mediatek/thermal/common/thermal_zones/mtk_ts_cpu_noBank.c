@@ -268,7 +268,7 @@ static int g_is_TempOutsideNormalRange;
 	unsigned int  __attribute__((weak))
 mt_gpufreq_get_max_power(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -276,7 +276,7 @@ mt_gpufreq_get_max_power(void)
 int __attribute__ ((weak))
 IMM_IsAdcInitReady(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 #endif
@@ -285,7 +285,7 @@ IMM_IsAdcInitReady(void)
 mtk_get_gpu_loading(unsigned int *pLoading)
 {
 #ifdef CONFIG_MTK_GPU_SUPPORT
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 #endif
 	return 0;
 }
@@ -293,46 +293,46 @@ mtk_get_gpu_loading(unsigned int *pLoading)
 	void __attribute__ ((weak))
 mt_ptp_lock(unsigned long *flags)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 }
 
 	void __attribute__ ((weak))
 mt_ptp_unlock(unsigned long *flags)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 }
 
 	void __attribute__ ((weak))
 mt_cpufreq_thermal_5A_limit(bool enable)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 }
 
 	unsigned int __attribute__ ((weak))
 mt_gpufreq_get_cur_freq(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int __attribute__ ((weak))
 mt_ppm_thermal_get_max_power(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int  __attribute__((weak))
 mt_gpufreq_get_seg_max_opp_index(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int  __attribute__((weak))
 mt_gpufreq_get_dvfs_table_num(void)
 {
-	pr_debug("E_WF: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -1669,7 +1669,7 @@ static int tscpu_thermal_suspend
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(50);
@@ -1683,7 +1683,7 @@ static int tscpu_thermal_suspend
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(2);
@@ -1724,7 +1724,7 @@ static int tscpu_thermal_suspend
 	do_gettimeofday(&end);
 
 	/* Get milliseconds */
-	pr_debug("suspend time spent, sec : %lu , usec : %lu\n",
+	pr_notice("suspend time spent, sec : %lu , usec : %lu\n",
 						(end.tv_sec - begin.tv_sec),
 						(end.tv_usec - begin.tv_usec));
 #endif
@@ -1819,7 +1819,7 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(50);
@@ -1833,7 +1833,7 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(2);
@@ -2554,7 +2554,7 @@ static void init_thermal(void)
 	while (cnt < 50) {
 		temp = (readl(THAHBST0) >> 16);
 		if ((cnt + 1) % 10 == 0)
-			pr_debug("THAHBST0 = 0x%x,cnt=%d, %d\n", temp, cnt,
+			pr_notice("THAHBST0 = 0x%x,cnt=%d, %d\n", temp, cnt,
 								__LINE__);
 
 		if (temp == 0x0) {

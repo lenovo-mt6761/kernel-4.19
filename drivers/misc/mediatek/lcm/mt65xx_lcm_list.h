@@ -305,7 +305,6 @@ extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_lcm_drv;
 extern struct LCM_DRIVER ili9881h_hdp_dsi_vdo_ilitek_rt5081_19_9_lcm_drv;
 extern struct LCM_DRIVER ili9881h_hdp_dsi_vdo_ilitek_rt5081_19_9_90hz_lcm_drv;
 extern struct LCM_DRIVER ili9881c_hd_dsi_vdo_ilitek_nt50358_lcm_drv;
-extern struct LCM_DRIVER ili9882n_hdp_dsi_vdo_rt4801_90hz_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_cmd_auo_rt4801_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_cmd_fhd_auo_rt4801_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_auo_rt4801_lcm_drv;
@@ -315,14 +314,11 @@ extern struct LCM_DRIVER hx83112b_fhdp_dsi_cmd_auo_rt5081_hdp_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_auo_rt5081_hdp_lcm_drv;
 extern struct LCM_DRIVER es6311_anx6585_zigzag_wxga_lcm_drv;
 extern struct LCM_DRIVER ft8201_wxga_vdo_incell_boe_lcm_drv;
+extern struct LCM_DRIVER ft8201m_wxga_vdo_incell_boe_lcm_drv;
 extern struct LCM_DRIVER nt51021h_wuxga_vdo_oncell_boe_lcm_drv;
 extern struct LCM_DRIVER nt36672ah_hdp_dsi_vdo_tcl_csot_lcm_drv;
 extern struct LCM_DRIVER nt36672ah_hdp_dsi_vdo_tcl_csot_fwvplus_lcm_drv;
 extern struct LCM_DRIVER sofeg01_fhdplus_dsi_cmd_samsung_lcm_drv;
-
-extern struct LCM_DRIVER icnl9911sac_6735_dsi_lcm_drv_yk6xx;
-extern struct LCM_DRIVER ili9881d_6735_dsi_lcm_drv_yk6xx;
-extern struct LCM_DRIVER ili9882_6735_dsi_lcm_drv_yk6xx;
 
 #if defined(NT36672C_FHDP_DSI_VDO_AUO_CPHY_90HZ_TIANMA)
 extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_tianma_lcm_drv;

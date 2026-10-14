@@ -252,14 +252,24 @@ enum ENUM_WLAN_DRV_BUF_TYPE_T {
 typedef uint8_t(*file_buf_handler)(void *ctx, const char __user *buf, uint16_t length);
 static file_buf_handler buf_handler[BUF_TYPE_NUM];
 static void *buf_handler_ctx[BUF_TYPE_NUM];
-void register_file_buf_handler(file_buf_handler handler, void *handler_ctx, uint8_t ucType)
+/*
+ * TB301FU (sjllls): renamed from register_file_buf_handler. When this
+ * adaptor is built-in, the stock wlan_drv_gen4m.ko from /vendor is still
+ * insmod'ed by modules.load. Its init registers wlanNvramBufHandler here
+ * and then FAILS on duplicate resources; a failed module init never runs
+ * module_exit, leaving buf_handler[] pointing into unmapped module space
+ * -> wlan_assistant IABT Oops at boot. With the new name the stale stock
+ * module cannot resolve the old symbol and is rejected by the module
+ * loader before ANY of its code runs.
+ */
+void mtk_register_file_buf_handler(file_buf_handler handler, void *handler_ctx, uint8_t ucType)
 {
 	if (ucType < BUF_TYPE_NUM) {
 		buf_handler[ucType] = handler;
 		buf_handler_ctx[ucType] = handler_ctx;
 	}
 }
-EXPORT_SYMBOL(register_file_buf_handler);
+EXPORT_SYMBOL(mtk_register_file_buf_handler);
 
 /*******************************************************************
  *  WHOLE CHIP RESET PROCEDURE:

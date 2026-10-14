@@ -26,13 +26,13 @@
 int __attribute__ ((weak))
 IMM_IsAdcInitReady(void)
 {
-	pr_debug("E_WF: thermal_charger: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: thermal_charger: %s doesn't exist\n", __func__);
 	return 0;
 }
 int __attribute__ ((weak))
 IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata)
 {
-	pr_debug("E_WF: thermal_charger: %s doesn't exist\n", __func__);
+	pr_notice("E_WF: thermal_charger: %s doesn't exist\n", __func__);
 	return -1;
 }
 
@@ -46,13 +46,16 @@ do { \
 } while (0)
 
 #define mtktscharger_dprintk_always(fmt, args...) \
-	pr_debug("[Thermal/tzcharger]" fmt, ##args)
+	pr_notice("[Thermal/tzcharger]" fmt, ##args)
 
-#define mtktscharger_pr_debug(fmt, args...) \
-	pr_debug("[Thermal/tzcharger]" fmt, ##args)
+#define mtktscharger_pr_notice(fmt, args...) \
+	pr_notice("[Thermal/tzcharger]" fmt, ##args)
+
+#define mtkts_btscharger_printk(fmt, args...) \
+	pr_debug("[Thermal/TZ/BTS]" fmt, ##args)
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
-struct iio_channel *thermistor_ch2;
+struct iio_channel *thermistor_ch3;
 #endif
 
 static kuid_t uid = KUIDT_INIT(0);
@@ -548,7 +551,7 @@ static int mtktscharger_get_hw_temp(void)
 #endif
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
-	ret = iio_read_channel_processed(thermistor_ch2, &val);
+	ret = iio_read_channel_processed(thermistor_ch3, &val);
 	if (ret < 0) {
 		mtktscharger_dprintk_always(
 			"Busy/Timeout, IIO ch read failed %d\n", ret);
@@ -623,6 +626,10 @@ static int mtktscharger_get_hw_temp(void)
 #endif
 
 	output = mtk_ts_btscharger_volt_to_temp(ret);
+
+	if (output > 40)  /* abnormal high temp */
+		mtkts_btscharger_printk("T_btscharger=%d\n", output);
+
 	mtktscharger_dprintk_always("BTSCHARGER ret = %d, temperature = %d\n",
 								ret, output);
 	return output;
@@ -812,10 +819,10 @@ struct thermal_cooling_device *cdev, unsigned long state)
 {
 	cl_dev_sysrst_state = state;
 	if (cl_dev_sysrst_state == 1) {
-		pr_debug("[Thermal/mtktscharger_sysrst] reset, reset, reset!!!\n");
-		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-		pr_debug("*****************************************\n");
-		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+		pr_notice("[Thermal/mtktscharger_sysrst] reset, reset, reset!!!\n");
+		pr_notice("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+		pr_notice("*****************************************\n");
+		pr_notice("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 
 		/* To trigger data abort to reset the system
 		 * for thermal protection.
@@ -885,7 +892,7 @@ void mtkts_btscharger_prepare_table(int table_num)
 		break;
 	}
 
-	pr_debug("[Thermal/TZ/BTSCHARGER] %s table_num=%d\n",
+	pr_notice("[Thermal/TZ/BTSCHARGER] %s table_num=%d\n",
 						__func__, table_num);
 }
 static int mtktscharger_read(struct seq_file *m, void *v)
@@ -1185,7 +1192,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 			/* check unsupport pin value, if unsupport,
 			 * set channel = 1 as default setting.
 			 */
-			g_RAP_ADC_channel = AUX_IN2_NTC;
+			g_RAP_ADC_channel = AUX_IN3_NTC;
 		else {
 			/* check if there is any param input,
 			 * if not using default g_RAP_ADC_channel:1
@@ -1194,7 +1201,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 				g_RAP_ADC_channel =
 				ptr_mtktsbtscharger_parm_data->adc_channel;
 			else
-				g_RAP_ADC_channel = AUX_IN2_NTC;
+				g_RAP_ADC_channel = AUX_IN3_NTC;
 		}
 #endif
 		mtktscharger_dprintk("adc_channel=%d\n",
@@ -1266,17 +1273,17 @@ static int mtktscharger_pdrv_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	thermistor_ch2 = devm_kzalloc(&pdev->dev, sizeof(*thermistor_ch2),
+	thermistor_ch3 = devm_kzalloc(&pdev->dev, sizeof(*thermistor_ch3),
 		GFP_KERNEL);
-	if (!thermistor_ch2)
+	if (!thermistor_ch3)
 		return -ENOMEM;
 
 
-	thermistor_ch2 = iio_channel_get(&pdev->dev, "thermistor-ch2");
-	ret = IS_ERR(thermistor_ch2);
+	thermistor_ch3 = iio_channel_get(&pdev->dev, "thermistor-ch3");
+	ret = IS_ERR(thermistor_ch3);
 	if (ret) {
 		mtktscharger_dprintk_always(
-			"[%s] fail to get auxadc iio ch2: %d\n",
+			"[%s] fail to get auxadc iio ch3: %d\n",
 			__func__, ret);
 		return ret;
 	}
@@ -1287,7 +1294,7 @@ static int mtktscharger_pdrv_probe(struct platform_device *pdev)
 
 	mtktscharger_dir = mtk_thermal_get_proc_drv_therm_dir_entry();
 	if (!mtktscharger_dir) {
-		mtktscharger_pr_debug("%s get /proc/driver/thermal failed\n",
+		mtktscharger_pr_notice("%s get /proc/driver/thermal failed\n",
 								__func__);
 	} else {
 		entry = proc_create("tzcharger", 0664, mtktscharger_dir,
@@ -1316,20 +1323,20 @@ static int mtktscharger_pdrv_remove(struct platform_device *pdev)
 
 
 #ifdef CONFIG_OF
-const struct of_device_id mt_thermistor_of_match3[2] = {
-	{.compatible = "mediatek,mtboard-thermistor3",},
+const struct of_device_id mt_thermistor_of_match4[2] = {
+	{.compatible = "mediatek,mtboard-thermistor4",},
 	{},
 };
 #endif
 
-#define THERMAL_THERMISTOR_NAME    "mtboard-thermistor3"
+#define THERMAL_THERMISTOR_NAME    "mtboard-thermistor4"
 static struct platform_driver mtktscharger_driver = {
 	.probe = mtktscharger_pdrv_probe,
 	.remove = mtktscharger_pdrv_remove,
 	.driver = {
 		.name = THERMAL_THERMISTOR_NAME,
 #ifdef CONFIG_OF
-		.of_match_table = mt_thermistor_of_match3,
+		.of_match_table = mt_thermistor_of_match4,
 #endif
 	},
 };

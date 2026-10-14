@@ -47,13 +47,7 @@
 #include "imgsensor_proc.h"
 #include "imgsensor_clk.h"
 #include "imgsensor.h"
-
-// light start
-#include <linux/proc_fs.h>   /* proc file use */
-#include <linux/seq_file.h>
-// light end
- 
-
+#include <linux/hardware_info.h>
 #define PDAF_DATA_SIZE 4096
 
 #ifdef CONFIG_MTK_SMI_EXT
@@ -82,6 +76,13 @@ struct IMGSENSOR  gimgsensor;
 struct IMGSENSOR *pgimgsensor = &gimgsensor;
 MUINT32 last_id;
 
+MUINT32 main_camera_sensor_id=0xFFFF;
+MUINT32 sub_camera_sensor_id=0xFFFF;
+struct IMGSENSOR_SENSOR main_psensor;
+struct IMGSENSOR_SENSOR sub_psensor;
+UINT8 main_sensor_qr[25]={0};
+UINT8 sub_sensor_qr[25]={0};
+UINT8 check_alive_delay = 0;
 /*prevent imgsensor race condition in vulunerbility test*/
 struct mutex imgsensor_mutex;
 
@@ -440,76 +441,6 @@ imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 	return ret ? -EIO : ret;
 }
 
-//add by ybx for camera info
- 
-// light start
-#define PROC_MAIN_CAM_INFO "driver/camera_info_main"
-#define PROC_SUB_CAM_INFO "driver/camera_info_sub"
-#define PROC_MAIN2_CAM_INFO "driver/camera_info_main2"
-
-#define cam_info_size 50
-
-char mtk_main_cam_name[50] = {0};
-char mtk_sub_cam_name[50] = {0};
-char mtk_main2_cam_name[50] = {0};
-
-
-//main camera
-static int subsys_main_cam_info_read(struct seq_file *m, void *v)
-{
-   seq_printf(m, "%s\n",mtk_main_cam_name);
-   return 0;
-};
-
-static int proc_main_cam_info_open(struct inode *inode, struct file *file)
-{
-    return single_open(file, subsys_main_cam_info_read, NULL);
-};
-
-static  struct file_operations cam_proc_fops_main = {
-    .owner = THIS_MODULE,
-    .open  = proc_main_cam_info_open,
-    .read  = seq_read,
-};
-
-//sub camera
-static int subsys_sub_cam_info_read(struct seq_file *m, void *v)
-{
-   seq_printf(m, "%s\n",mtk_sub_cam_name);
-   return 0;
-};
-
-static int proc_sub_cam_info_open(struct inode *inode, struct file *file)
-{
-    return single_open(file, subsys_sub_cam_info_read, NULL);
-};
-
-static  struct file_operations cam_proc_fops_sub = {
-    .owner = THIS_MODULE,
-    .open  = proc_sub_cam_info_open,
-    .read  = seq_read,
-};
-
-static int subsys_main2_cam_info_read(struct seq_file *m, void *v)
-{
-   seq_printf(m, "%s\n",mtk_main2_cam_name);
-   return 0;
-};
-
-static int proc_main2_cam_info_open(struct inode *inode, struct file *file)
-{
-    return single_open(file, subsys_main2_cam_info_read, NULL);
-};
-
-static  struct file_operations cam_proc_fops_main2 = {
-    .owner = THIS_MODULE,
-    .open  = proc_main2_cam_info_open,
-    .read  = seq_read,
-};
-// light end
- 
-//add end
-
 /************************************************************************
  * imgsensor_check_is_alive
  ************************************************************************/
@@ -519,9 +450,11 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 	UINT32 err = 0;
 	MUINT32 sensorID = 0;
 	MUINT32 retLen = sizeof(MUINT32);
+	MUINT32 qrLen = 25;
+	enum IMGSENSOR_SENSOR_IDX sensor_idx = psensor->inst.sensor_idx;
 
 	IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
-
+	check_alive_delay = 5;
 	err = imgsensor_hw_power(&pgimgsensor->hw,
 				psensor,
 				psensor_inst->psensor_name,
@@ -538,21 +471,31 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 		pr_info("Fail to get sensor ID %x\n", sensorID);
 		err = ERROR_SENSOR_CONNECT_FAIL;
 	} else {
+		if(sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN)
+		{
+			main_camera_sensor_id = sensorID;
+			//main_psensor = psensor;
+			memcpy((char*)&main_psensor,(char*)psensor,sizeof(struct IMGSENSOR_SENSOR));
+			imgsensor_sensor_feature_control(
+			psensor,
+			SENDOR_FEATURE_GET_QR_CODE,
+			(MUINT8 *)main_sensor_qr,
+			&qrLen);
+
+		}
+		else if(sensor_idx == IMGSENSOR_SENSOR_IDX_SUB)
+		{
+			sub_camera_sensor_id = sensorID;
+			//sub_psensor = psensor;
+			memcpy((char*)&sub_psensor,(char*)psensor,sizeof(struct IMGSENSOR_SENSOR));
+			imgsensor_sensor_feature_control(
+			psensor,
+			SENDOR_FEATURE_GET_QR_CODE,
+			(MUINT8 *)sub_sensor_qr,
+			&qrLen);
+		}
+
 		pr_info(" Sensor found ID = 0x%x\n", sensorID);
-		#if 1 
-		if (psensor->inst.sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN)
-		{
-			snprintf(mtk_main_cam_name,sizeof(mtk_main_cam_name),"%s",psensor_inst->psensor_name); 
-		}
-		else if (psensor->inst.sensor_idx == IMGSENSOR_SENSOR_IDX_SUB)
-		{
-			snprintf(mtk_sub_cam_name,sizeof(mtk_sub_cam_name),"%s",psensor_inst->psensor_name); 
-		}
-		else if (psensor->inst.sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN2)
-		{
-			snprintf(mtk_main2_cam_name,sizeof(mtk_main2_cam_name),"%s",psensor_inst->psensor_name); 
-		}
-		#endif
 		err = ERROR_NONE;
 	}
 
@@ -2951,6 +2894,415 @@ static const struct file_operations gimgsensor_file_operations = {
 #endif
 };
 
+#define QR_CODE_SIZE 20
+static ssize_t rear_camera_id_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+		return sprintf(buf, "%x\n", main_camera_sensor_id);
+}
+
+static ssize_t rear_camera_id_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+		return -1;
+}
+
+static ssize_t front_camera_id_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+
+		return sprintf(buf, "%x\n", sub_camera_sensor_id);
+}
+
+static ssize_t front_camera_id_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+	return -1;
+}
+
+////////////////////////////////////QR///////////////////////////////////////////////////////
+#if 0
+static void imgsensor_get_qr_code(struct IMGSENSOR_SENSOR *psensor)
+{
+	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
+	UINT32 err = 0;
+	MUINT32 qrLen = 25;
+	enum IMGSENSOR_SENSOR_IDX i = IMGSENSOR_SENSOR_IDX_MIN_NUM;
+	mutex_lock(&imgsensor_mutex);
+
+	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0)
+		imgsensor_clk_enable_all(&pgimgsensor->clk);
+
+	atomic_inc(&pgimgsensor->imgsensor_open_cnt);
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+
+	imgsensor_mutex_init(psensor_inst);
+	imgsensor_i2c_init(&psensor_inst->i2c_cfg,
+	imgsensor_custom_config[
+	(unsigned int)psensor_inst->sensor_idx].i2c_dev);
+	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, true);
+
+	IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
+
+	err = imgsensor_hw_power(&pgimgsensor->hw,
+				psensor,
+				psensor_inst->psensor_name,
+				IMGSENSOR_HW_POWER_STATUS_ON);
+
+	imgsensor_sensor_feature_control(
+			psensor,
+			SENDOR_FEATURE_GET_QR_CODE,
+			(MUINT8 *)main_sensor_qr,
+			&qrLen);
+
+	imgsensor_hw_power(&pgimgsensor->hw,
+	    psensor,
+	    psensor_inst->psensor_name,
+	    IMGSENSOR_HW_POWER_STATUS_OFF);
+	IMGSENSOR_PROFILE(&psensor_inst->profile_time, "get_qr_code");
+	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, false);
+
+		mutex_lock(&imgsensor_mutex);
+
+	atomic_dec(&pgimgsensor->imgsensor_open_cnt);
+	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0) {
+		imgsensor_clk_disable_all(&pgimgsensor->clk);
+
+		if (pgimgsensor->imgsensor_oc_irq_enable != NULL) {
+			for (; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++)
+				pgimgsensor->imgsensor_oc_irq_enable(i, false);
+		}
+
+		imgsensor_hw_release_all(&pgimgsensor->hw);
+#ifdef IMGSENSOR_DFS_CTRL_ENABLE
+		imgsensor_dfs_ctrl(DFS_RELEASE, NULL);
+#endif
+	}
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+}
+//#else
+static void imgsensor_get_qr_code(struct IMGSENSOR_SENSOR *psensor)
+{
+	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
+//	UINT32 err = 0;
+	MUINT32 qrLen = 25;
+
+IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
+	imgsensor_sensor_feature_control(
+			psensor,
+			SENDOR_FEATURE_GET_QR_CODE,
+			(MUINT8 *)main_sensor_qr,
+			&qrLen);
+IMGSENSOR_PROFILE(&psensor_inst->profile_time, "get_qr_code");
+}
+#endif
+
+
+static ssize_t rear_camera_qr_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+	int i;
+	unsigned char num = QR_CODE_SIZE;
+	for(i=0;i<num;i++)
+	{
+		buf[i] = main_sensor_qr[i];
+	}
+	buf[QR_CODE_SIZE] = '\n';
+	return QR_CODE_SIZE+1;
+}
+
+static ssize_t rear_camera_qr_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+	return -1;
+}
+
+static ssize_t front_camera_qr_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	int i;
+	unsigned char num = QR_CODE_SIZE;
+	//imgsensor_get_qr_code(&sub_psensor);
+		for(i=0;i<num;i++)
+	{
+		//sprintf(&buf[i * 2], "%02X", sub_sensor_qr[i]);
+		buf[i] = sub_sensor_qr[i];
+	}
+	buf[QR_CODE_SIZE] = '\n';
+	return QR_CODE_SIZE+1;
+}
+
+static ssize_t front_camera_qr_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+	return -1;
+}
+///////////////////////////////QR////////////////////////////////////////////////////////////
+//////////////////////////////camera info////////////////////////////////////////////////////
+extern struct hardware_info current_camera_info;
+#define CAMERA_INFO_SIZE 32
+static ssize_t rear_camera_info_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+		unsigned char i;
+		for(i=0; i< CAMERA_INFO_SIZE; i++)
+		{
+
+			buf[i] = current_camera_info.more[i];
+			if(current_camera_info.more[i] == '\0')
+				break;
+		}
+		//memcpy((void *)buf,(void *)&current_camera_info.more[0],CAMERA_INFO_SIZE);
+		return i;
+}
+
+static ssize_t rear_camera_info_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+		return -1;
+}
+
+static ssize_t front_camera_info_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+		unsigned char i;
+		for(i=0; i< CAMERA_INFO_SIZE; i++)
+		{
+
+			buf[i] = current_camera_info.chip[i];
+			if(current_camera_info.chip[i] == '\0')
+				break;
+		}
+		//memcpy((void *)buf,(void *)&current_camera_info.chip[0],CAMERA_INFO_SIZE);
+		return i;
+}
+
+static ssize_t front_camera_info_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+	return -1;
+}
+//////////////////////////////camera info end////////////////////////////////////////////////
+//////////////////////////////camera otp check //////////////////////////////////////////////
+#define OTP_CHECK_WHILE_CAMERA_OPEN 1
+#if OTP_CHECK_WHILE_CAMERA_OPEN
+static int8_t imgsensor_check_otp_data(struct IMGSENSOR_SENSOR *psensor)
+{
+	UINT32 len = 1;
+	UINT16 result = 0;
+	imgsensor_sensor_feature_control(
+			psensor,
+			SENSOR_FEATURE_CHECK_OTP_DATA,
+			(MUINT8 *)&result,
+			&len);
+
+	if(result > 0)
+		return 1;
+	else
+		return -1;
+}
+#else
+static int8_t imgsensor_check_otp_data(struct IMGSENSOR_SENSOR *psensor)
+{
+	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
+	UINT32 err = 0;
+	UINT32 len = 1;
+	UINT16 result = 0;
+	enum IMGSENSOR_SENSOR_IDX i = IMGSENSOR_SENSOR_IDX_MIN_NUM;
+	mutex_lock(&imgsensor_mutex);
+
+	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0)
+		imgsensor_clk_enable_all(&pgimgsensor->clk);
+
+	atomic_inc(&pgimgsensor->imgsensor_open_cnt);
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, true);
+
+	err = imgsensor_hw_power(&pgimgsensor->hw,
+				psensor,
+				psensor_inst->psensor_name,
+				IMGSENSOR_HW_POWER_STATUS_ON);
+
+	imgsensor_sensor_feature_control(
+			psensor,
+			SENSOR_FEATURE_CHECK_OTP_DATA,
+			(MUINT8 *)&result,
+			&len);
+
+	imgsensor_hw_power(&pgimgsensor->hw,
+	    psensor,
+	    psensor_inst->psensor_name,
+	    IMGSENSOR_HW_POWER_STATUS_OFF);
+	IMGSENSOR_PROFILE(&psensor_inst->profile_time, "check_otp_data");
+	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, false);
+	mutex_lock(&imgsensor_mutex);
+	atomic_dec(&pgimgsensor->imgsensor_open_cnt);
+	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0) {
+		imgsensor_clk_disable_all(&pgimgsensor->clk);
+
+		if (pgimgsensor->imgsensor_oc_irq_enable != NULL) {
+			for (; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++)
+				pgimgsensor->imgsensor_oc_irq_enable(i, false);
+		}
+
+	}
+		imgsensor_hw_release_all(&pgimgsensor->hw);
+#ifdef IMGSENSOR_DFS_CTRL_ENABLE
+		imgsensor_dfs_ctrl(DFS_RELEASE, NULL);
+#endif
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+	if(result > 0)
+		return 1;
+	else
+		return -1;
+}
+#endif
+
+static ssize_t rear_camera_otp_check_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+		MINT8 result = 0;
+		MINT8 num = 0;
+		if(main_camera_sensor_id != 0xFFFF)
+		{
+			result = imgsensor_check_otp_data(&main_psensor);
+		}
+		num = sprintf(buf,"%s\n",result > 0?"PASS":"FAIL");
+		return num;
+}
+
+static ssize_t rear_camera_otp_check_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+		
+		return -1;
+}
+
+static ssize_t front_camera_otp_check_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+		MINT8 result = 0;
+		MINT8 num = 0;
+		if(sub_camera_sensor_id != 0xFFFF)
+		{
+			result = imgsensor_check_otp_data(&sub_psensor);
+		}
+		num = sprintf(buf,"%s\n",result > 0?"PASS":"FAIL");
+		return num;
+}
+
+static ssize_t front_camera_otp_check_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+
+	return -1;
+}
+//////////////////////////////camera otp check end//////////////////////////////////////////////
+///////////////////////////////camera power//////////////////////////////////////////////////
+int g_camera_idx = 0xff;
+int g_power_status = 0;
+static void imgsensor_power_set(struct IMGSENSOR_SENSOR *psensor,unsigned char status)
+{
+	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
+	UINT32 err = 0;
+	if(status)
+	{
+		err = imgsensor_hw_power_ft(&pgimgsensor->hw,
+				psensor,
+				psensor_inst->psensor_name,
+				IMGSENSOR_HW_POWER_STATUS_ON);
+	}
+	else
+	{
+		imgsensor_hw_power_ft(&pgimgsensor->hw,
+		    psensor,
+		    psensor_inst->psensor_name,
+		    IMGSENSOR_HW_POWER_STATUS_OFF);
+	}
+
+}
+
+static ssize_t camera_power_show(struct device *dev, struct device_attribute *attr,char *buf)
+{
+		if(g_camera_idx == 0 || g_camera_idx == 1)
+		{
+			return sprintf(buf,"current camera is %s,power:%s\n",g_camera_idx==0?"rear":"front",g_power_status?"on":"off");
+		}
+		else
+			return sprintf(buf,"%s\n","unsupport camera info");
+}
+
+static ssize_t camera_power_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+		int camera_idx = 0xff;
+		int cam_on_off = 0;
+		sscanf(buf, "%d,%d", &camera_idx,&cam_on_off);
+		printk("%s,camera_idx=%d,cam_on_off = %d\n",__func__,camera_idx,cam_on_off);
+		g_camera_idx = camera_idx;
+		g_power_status = cam_on_off;
+		if(camera_idx == 0)
+		{
+			printk("turn on main sensor power,cam_on_off = %d\n",cam_on_off);
+			imgsensor_power_set(&main_psensor,cam_on_off);
+		}
+		else if(camera_idx == 1)
+		{
+			printk("turn on sub sensor power,cam_on_off = %d\n",cam_on_off);
+			imgsensor_power_set(&sub_psensor,cam_on_off);
+		}
+		return count;
+}
+
+///////////////////////////////camera power//////////////////////////////////////////////////
+static DEVICE_ATTR_RW(rear_camera_id);
+static DEVICE_ATTR_RW(front_camera_id);
+static DEVICE_ATTR_RW(rear_camera_qr);
+static DEVICE_ATTR_RW(front_camera_qr);
+static DEVICE_ATTR_RW(camera_power);
+static DEVICE_ATTR_RW(rear_camera_info);
+static DEVICE_ATTR_RW(front_camera_info);
+static DEVICE_ATTR_RW(rear_camera_otp_check);
+static DEVICE_ATTR_RW(front_camera_otp_check);
+
+
+static struct attribute *camera_device_attrs[] = {
+	&dev_attr_rear_camera_id.attr,
+	&dev_attr_front_camera_id.attr,
+	&dev_attr_rear_camera_qr.attr,
+	&dev_attr_front_camera_qr.attr,
+	&dev_attr_camera_power.attr,
+	&dev_attr_rear_camera_info.attr,
+	&dev_attr_front_camera_info.attr,
+	&dev_attr_rear_camera_otp_check.attr,
+	&dev_attr_front_camera_otp_check.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(camera_device);
+
 static inline int imgsensor_driver_register(void)
 {
 	dev_t dev_no = MKDEV(IMGSENSOR_DEVICE_NNUMBER, 0);
@@ -2988,7 +3340,7 @@ static inline int imgsensor_driver_register(void)
 		PK_DBG("Unable to create class, err = %d\n", ret);
 		return ret;
 	}
-
+	gpimgsensor_class->dev_groups = camera_device_groups;
 	gimgsensor_device =
 	    device_create(
 		    gpimgsensor_class,
@@ -3040,14 +3392,7 @@ static int imgsensor_probe(struct platform_device *pdev)
 	imgsensor_hw_init(&pgimgsensor->hw);
 	imgsensor_i2c_create();
 	imgsensor_proc_init();
-// light start
-       memset(mtk_main_cam_name,0,cam_info_size);
-       memset(mtk_sub_cam_name,0,cam_info_size);
-       memset(mtk_main2_cam_name,0,cam_info_size);
-       proc_create(PROC_MAIN_CAM_INFO, 0, NULL, &cam_proc_fops_main);
-       proc_create(PROC_SUB_CAM_INFO, 0, NULL, &cam_proc_fops_sub);
-       proc_create(PROC_MAIN2_CAM_INFO, 0, NULL, &cam_proc_fops_main2);
-// light end
+
 	atomic_set(&pgimgsensor->imgsensor_open_cnt, 0);
 #ifdef CONFIG_MTK_SMI_EXT
 	mmdvfs_register_mmclk_switch_cb(

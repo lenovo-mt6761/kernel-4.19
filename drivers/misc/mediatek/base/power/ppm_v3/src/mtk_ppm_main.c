@@ -650,14 +650,12 @@ int mt_ppm_main(void)
 			pos->is_limit_updated = true;
 
 			for (idx = 0; idx < pos->req.cluster_num; idx++) {
-#ifdef CONFIG_MTK_SCHED_TRACERS
 				trace_ppm_user_setting(
 					pos->policy,
 					idx,
 					pos->req.limit[idx].min_cpufreq_idx,
 					pos->req.limit[idx].max_cpufreq_idx
 				);
-#endif
 			}
 
 			ppm_unlock(&pos->lock);

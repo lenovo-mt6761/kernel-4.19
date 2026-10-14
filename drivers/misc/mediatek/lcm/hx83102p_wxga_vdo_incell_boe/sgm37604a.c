@@ -56,7 +56,7 @@ static struct i2c_driver sgm37604a_driver = {
 static DEFINE_MUTEX(sgm37604a_i2c_access);
 
 /* I2C Function For Read/Write */
-int sgm37604a_read_byte(unsigned char cmd, unsigned char *returnData)
+int hx83102p_sgm37604a_read_byte(unsigned char cmd, unsigned char *returnData)
 {
 	char cmd_buf[2] = { 0x00, 0x00 };
 	char readData = 0;
@@ -80,7 +80,7 @@ int sgm37604a_read_byte(unsigned char cmd, unsigned char *returnData)
 	return 1;
 }
 
-int sgm37604a_write_byte(unsigned char cmd, unsigned char writeData)
+int hx83102p_sgm37604a_write_byte(unsigned char cmd, unsigned char writeData)
 {
 	char write_data[2] = { 0 };
 	int ret = 0;

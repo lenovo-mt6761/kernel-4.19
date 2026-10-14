@@ -1541,7 +1541,10 @@ VOID osal_op_raise_signal(P_OSAL_OP pOp, INT32 result)
 INT32 osal_ftrace_print(const PINT8 str, ...)
 {
 	int ret = 0;
-#ifdef CONFIG_TRACING
+#if defined(CONFIG_TRACING) && !defined(CONFIG_WLAN_DRV_BUILD_IN)
+/* TB301FU (sjllls): skip trace_printk for built-in builds - the
+ * __trace_printk_fmt section it creates perturbs ftrace setup on this
+ * platform ("trace_printk() being used" never appears on stock). */
 	va_list args;
 	INT8 tempString[DBG_LOG_STR_SIZE];
 

@@ -398,6 +398,11 @@ endif
 
 ifneq ($(filter MTK_WCN_REMOVE_KERNEL_MODULE,$(KBUILD_SUBDIR_CCFLAGS)),)
     ccflags-y += -DCFG_BUILT_IN_DRIVER=1
+else ifeq ($(CONFIG_WLAN_DRV_BUILD_IN)_$(CONFIG_MTK_WIFI_DRV_BUILD_IN),y_y)
+    # TB301FU (sjllls): KBUILD_SUBDIR_CCFLAGS is not populated by 4.19 kbuild;
+    # honor the Kconfig switch instead so gl_init exports
+    # mtk_wcn_wlan_gen4_init() for the wmt chip-detect instead of its own initcall.
+    ccflags-y += -DCFG_BUILT_IN_DRIVER=1
 else
     ccflags-y += -DCFG_BUILT_IN_DRIVER=0
 endif
@@ -578,18 +583,27 @@ endif
 ifeq ($(CONFIG_MTK_WIFI_ONLY),$(filter $(CONFIG_MTK_WIFI_ONLY),m y))
 obj-$(CONFIG_MTK_WIFI_ONLY) += $(MODULE_NAME).o
 else
+# TB301FU (sjllls): when built-in, skip the obj-m assignment below -
+# 4.19 kbuild does not dedup an object listed in both obj-y and obj-m.
+ifneq ($(CONFIG_WLAN_DRV_BUILD_IN)_$(CONFIG_MTK_WIFI_DRV_BUILD_IN),y_y)
 obj-$(CONFIG_MTK_COMBO_WIFI) += $(MODULE_NAME).o
+endif
 #obj-y += $(MODULE_NAME).o
 endif
 
-ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
+ifeq ($(CONFIG_WLAN_DRV_BUILD_IN)_$(CONFIG_MTK_WIFI_DRV_BUILD_IN),y_y)
 $(warning $(MODULE_NAME) build-in boot.img)
 obj-y += $(MODULE_NAME).o
 ccflags-y += -DCONFIG_WLAN_DRV_BUILD_IN=1
 else
 $(warning $(MODULE_NAME) is kernel module)
 obj-m += $(MODULE_NAME).o
+# TB301FU (sjllls): only define =0 when the main switch is off; when
+# WLAN_DRV_BUILD_IN=y (WiFi pieces excluded via MTK_WIFI_DRV_BUILD_IN=n)
+# autoconf.h already defines it as 1 and redefining to 0 breaks -Werror.
+ifneq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
 ccflags-y += -DCONFIG_WLAN_DRV_BUILD_IN=0
+endif
 endif
 
 ifeq ($(CONFIG_MTK_WIFI_PKT_OFLD_SUPPORT), y)
