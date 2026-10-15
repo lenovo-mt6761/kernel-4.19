@@ -63,31 +63,58 @@ static const struct ksu_feature_handler su_compat_handler = {
 	.set_handler = su_compat_feature_set,
 };
 
-static void __user *userspace_stack_buffer(const void *d, size_t len)
+/*
+ * TB301FU (4.19 kprobes build): upstream writes the replacement path into
+ * memory below the user stack pointer via copy_to_user(). That region is
+ * not guaranteed to be mapped, and in the tracepoint (preemption off)
+ * copy_to_user() cannot fault it in, so the write silently failed or left
+ * the pointer aimed at garbage. Observed effect: the next execve read back
+ * path='' and su never resolved.
+ *
+ * Instead, reuse the page the caller's own path string already lives on:
+ * it is mapped by definition, and it is dead once execve() consumes it.
+ * Copy the replacement just below the original string, keeping the same
+ * mapping. Fall back to the old stack trick only if that fails.
+ */
+static void __user *userspace_path_buffer(const char __user *orig,
+					  const void *d, size_t len)
 {
-	// Stack Pointer must be 16-byte aligned.
-	// We also subtract a safe margin (256 bytes) 
-	// to avoid corrupting local variables or smth
-	unsigned long sp = current_user_stack_pointer();
-	sp = (sp - len - 256) & ~0xFUL; // Align downwards to nearest 16 bytes
+	char __user *p;
 
-	char __user *p = (char __user *)sp;
+	if (orig) {
+		unsigned long aligned = (unsigned long)orig;
+
+		/* keep it inside the caller's mapping and 16-byte aligned */
+		aligned = (aligned - len - 16) & ~0xFUL;
+		if (aligned > TASK_SIZE / 2) {
+			p = (char __user *)aligned;
+			if (!copy_to_user(p, d, len))
+				return p;
+		}
+	}
+
+	/* Stack Pointer must be 16-byte aligned. We also subtract a safe
+	 * margin (256 bytes) to avoid corrupting local variables or smth. */
+	unsigned long sp = current_user_stack_pointer();
+	sp = (sp - len - 256) & ~0xFUL;
+
+	p = (char __user *)sp;
 
 	return copy_to_user(p, d, len) ? NULL : p;
 }
 
-static char __user *sh_user_path(void)
+static char __user *sh_user_path(const char __user *orig)
 {
 	static const char sh_path[] = "/system/bin/sh";
 
-	return userspace_stack_buffer(sh_path, sizeof(sh_path));
+	return userspace_path_buffer(orig, sh_path, sizeof(sh_path));
 }
 
-static char __user *ksud_user_path(void)
+static char __user *ksud_user_path(const char __user *orig)
 {
 	static const char ksud_path[] = KSUD_PATH;
 
-	return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
+	return userspace_path_buffer(orig, ksud_path, sizeof(ksud_path));
 }
 
 int ksu_handle_faccessat(int *dfd, const char __user **filename_user,
@@ -110,7 +137,7 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user,
 	if (unlikely(!memcmp(path, su, sizeof(su)))) {
 		ksu_compat_sulog('a');
 		pr_info("faccessat su->sh!\n");
-		*filename_user = sh_user_path();
+		*filename_user = sh_user_path(*filename_user);
 	}
 
 	return 0;
@@ -140,7 +167,7 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 	if (unlikely(!memcmp(path, su, sizeof(su)))) {
 		ksu_compat_sulog('s');
 		pr_info("newfstatat su->sh!\n");
-		*filename_user = sh_user_path();
+		*filename_user = sh_user_path(*filename_user);
 	}
 
 	return 0;
@@ -171,19 +198,41 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 	if (!ksu_is_allow_uid_for_current(current_uid().val))
 		goto do_orig_execve;
 
-	if (get_user(fn_addr, filename_user))
+	/*
+	 * TB301FU (4.19 kprobes build): filename_user is
+	 * &PT_REGS_PARM1(regs), i.e. the address of the argument slot inside
+	 * the kernel's pt_regs copy - a KERNEL address, not a user one.
+	 * Upstream calls get_user(fn_addr, filename_user) on it, which always
+	 * fails: get_user() runs access_ok() and rejects kernel addresses, so
+	 * it returned -EFAULT on every single call and su silently stopped
+	 * working for every app - execve("/system/bin/su") fell through to the
+	 * real (absent) binary and returned ENOENT, with nothing logged.
+	 * faccessat/newfstatat kept working because they read the pointer
+	 * straight out of the syscall argument slot instead.
+	 *
+	 * ksu_handle_faccessat() gets this right: dereference the register
+	 * slot directly with *filename_user (a plain kernel read), then copy
+	 * from the resulting user address. Do the same here - no get_user(),
+	 * no pagefault_disable().
+	 */
+	fn_addr = (const char __user *)untagged_addr(
+			(unsigned long)*filename_user);
+	if (unlikely(!fn_addr))
 		goto do_orig_execve;
 
 	addr = untagged_addr((unsigned long)fn_addr);
 	fn = (const char __user *)addr;
 	memset(path, 0, sizeof(path));
 
+	/*
+	 * TB301FU (4.19 kprobes build): atomic context (preemption off).
+	 * strncpy_from_user_nofault() never enters the fault path, so it is
+	 * the only safe reader here. The upstream
+	 * preempt_enable_no_resched_notrace() fallback is removed: it would
+	 * re-enable preemption inside the sys_enter tracepoint and let a
+	 * faulting copy sleep in ext4 ("BUG: scheduling while atomic").
+	 */
 	ret = strncpy_from_user_nofault(path, fn, sizeof(path));
-	if (ret < 0 && preempt_count()) {
-		preempt_enable_no_resched_notrace();
-		ret = strncpy_from_user(path, fn, sizeof(path));
-		preempt_disable_notrace();
-	}
 
 	if (ret < 0) {
 		goto do_orig_execve;
@@ -196,7 +245,6 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 
     pr_info("sys_execve su found\n");
 	pending_sucompat = ksu_sulog_capture_sucompat(fn, argv_user, GFP_KERNEL);
-    *filename_user = ksud_user_path();
 
 	ret = escape_with_root_profile();
 	if (ret) {
@@ -204,6 +252,11 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 		ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
 		goto do_orig_execve;
 	}
+	/*
+	 * TB301FU: assign the redirect only after the escape succeeded,
+	 * so a rejected escape cannot leave the argument pointing at the
+	 * replacement buffer while the original execve still runs.
+	 */
 	if (preempt_count() > 0) {
 		/*
 		 * Can't open files here (kprobe context). Before the manager has
@@ -213,9 +266,9 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 		 * switches to ksud as soon as the manager has installed it.
 		 */
 		if (READ_ONCE(ksu_ksud_present)) {
-			*filename_user = ksud_user_path();
+			*filename_user = ksud_user_path(fn);
 		} else {
-			*filename_user = sh_user_path();
+			*filename_user = sh_user_path(fn);
 			ksu_recheck_ksud();
 		}
 	} else {
@@ -223,11 +276,11 @@ static long ksu_handle_execve_sucompat_common(const char __user **filename_user,
 		if (IS_ERR(f)) {
 			pr_warn("ksud inaccesible, aplicando fallback a sh\n");
 			ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-			*filename_user = sh_user_path();
+			*filename_user = sh_user_path(fn);
 		} else {
 			filp_close(f, NULL);
 			ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-			*filename_user = ksud_user_path();
+			*filename_user = ksud_user_path(fn);
 		}
 	}
 do_orig_execve:

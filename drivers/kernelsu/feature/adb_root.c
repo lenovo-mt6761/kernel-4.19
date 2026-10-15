@@ -19,7 +19,12 @@
 
 DEFINE_STATIC_KEY_FALSE(ksu_adb_root);
 
-static long is_exec_adbd(const char __user *filename_user)
+/*
+ * TB301FU: exposed (non-static) so hook_manager.c can tell whether the
+ * adb_root execve handler actually consumed this execve, and only then
+ * skip the sucompat redirect. Atomic-context safe (nofault user copy).
+ */
+long is_exec_adbd(const char __user *filename_user)
 {
     static const char kAdbd[] = "/adbd";
     static const size_t kAdbdLen = sizeof(kAdbd) - 1;

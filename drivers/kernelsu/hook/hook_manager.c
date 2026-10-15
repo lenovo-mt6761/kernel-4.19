@@ -352,6 +352,7 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 						(const char __user **)&PT_REGS_PARM2(regs) :
 						(const char __user **)&PT_REGS_PARM1(regs);
 				long adb_ret;
+				bool adb_root_handled = false;
 				if (current->pid != 1 && is_init(current_cred())) {
 					ksu_handle_init_mark_tracker(filename_user);
 					adb_ret = is_execveat ?
@@ -360,10 +361,35 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 					if (adb_ret) {
 						pr_err("adb root failed: %ld\n", adb_ret);
 					}
-				} else if (is_execveat) {
-					ksu_handle_execveat_sucompat_user(filename_user, 0, regs);
-				} else {
-					ksu_handle_execve_sucompat(filename_user, 0, regs);
+					/*
+					 * TB301FU (4.19): the adb_root handler
+					 * only rewrites the argv/stack for adbd and
+					 * silently returns 0 for every other path.
+					 * Making this branch exclusive therefore
+					 * starved sucompat: a process whose cred is
+					 * still in the init domain (which is what an
+					 * app forked from the init/zygote lineage
+					 * looks like) never reached the sucompat
+					 * redirect, so execve("/system/bin/su") fell
+					 * through to the real, nonexistent binary and
+					 * returned ENOENT. Apps got no root while
+					 * faccessat/newfstatat on the same path kept
+					 * working, since those are not gated here.
+					 * Fall through to sucompat unless the
+					 * adb_root path actually consumed adbd.
+					 */
+					if (is_exec_adbd(is_execveat ?
+							(const char __user *)PT_REGS_PARM2(regs) :
+							(const char __user *)PT_REGS_PARM1(regs))) {
+						adb_root_handled = true;
+					}
+				}
+				if (unlikely(!adb_root_handled)) {
+					if (is_execveat) {
+						ksu_handle_execveat_sucompat_user(filename_user, 0, regs);
+					} else {
+						ksu_handle_execve_sucompat(filename_user, 0, regs);
+					}
 				}
 				return;
 			}
