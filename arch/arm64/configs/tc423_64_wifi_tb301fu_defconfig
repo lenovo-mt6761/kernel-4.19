@@ -535,3 +535,8 @@ CONFIG_MTK_COMBO_WIFI=y
 CONFIG_MTK_CONNFEM=y
 # Test B bisect: WiFi (gen4m/chrdev) stays as loadable modules
 CONFIG_MTK_WIFI_DRV_BUILD_IN=y
+# TB301FU: KernelSU-Next (legacy branch, c81cdf5) vendored in-tree
+CONFIG_KSU=y
+# 4.19 arm64: kprobes+tracepoint hook (only mode that installs the
+# [ksu_driver] fd for the manager via the setresuid sys_enter hook)
+CONFIG_KSU_KPROBES_HOOK=y
