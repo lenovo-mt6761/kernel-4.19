@@ -8,6 +8,7 @@
 #include <linux/ptrace.h>
 #include <linux/static_key.h>
 #include <linux/slab.h>
+#include <linux/kconfig.h>
 
 #include "adb_root.h"
 #include "arch.h"
@@ -34,11 +35,21 @@ static long is_exec_adbd(const char __user *filename_user)
      * with preemption disabled. A plain strncpy_from_user() may fault and
      * sleep in ext4, which triggers "BUG: scheduling while atomic".
      * Use the nofault variant so it never touches the page fault path.
+     *
+     * NB: the two variants do NOT return the same thing.
+     * strncpy_from_user() returns strlen; strncpy_from_user_nofault()
+     * returns strlen + 1 (see mm/maccess.c: "returns the length of the
+     * string INCLUDING the trailing NUL"). Normalise it back to strlen
+     * here, otherwise the "/adbd" suffix comparison below is off by one
+     * byte and never matches, silently disabling adb root.
      */
     ret = strncpy_from_user_nofault(buf, fn, sizeof(buf));
     if (ret < 0) {
         pr_warn("Access filename when adb_root_handle_execve failed: %ld\n", ret);
         return ret;
+    }
+    if (ret > 0) {
+        ret--; /* drop the NUL that nofault counted */
     }
 
     // strncpy_from_user may copy `sizeof(buf)` bytes
@@ -76,28 +87,28 @@ static long setup_ld_preload(struct pt_regs *regs, unsigned long *envp_p)
     envp = (char __user **)untagged_addr((unsigned long)*envp_p);
 
     /*
-     * TB301FU (4.19 kprobes build): called from the sys_enter tracepoint in
-     * atomic context. copy_to_user()/copy_from_user() below can take a page
-     * fault, which sleeps in ext4 and triggers "BUG: scheduling while atomic".
-     * Disable page faults for the duration so the copies fail with -EFAULT
-     * instead of sleeping. Same approach as the fstat kretprobe handler.
+     * TB301FU (4.19 kprobes build): called from the sys_enter tracepoint,
+     * i.e. atomic context. Page faults are still allowed here (they do not
+     * sleep), so we must NOT use pagefault_disable(): the fresh stack pages
+     * we are about to write the new envp into are usually not faulted in
+     * yet, and disabling faults would make every copy_to_user() fail with
+     * -EFAULT, silently dropping the LD_PRELOAD injection.
+     *
+     * What must be avoided is *sleeping* (kern_path(), krealloc GFP_KERNEL),
+     * not faulting. Those are handled separately below.
      */
-    pagefault_disable();
-
     ld_preload_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdPreload), 8);
     ret = copy_to_user(ld_preload_p, kLdPreload, sizeof(kLdPreload));
     if (ret != 0) {
         pr_warn("write ld_preload when adb_root_handle_execve failed: %ld\n", ret);
-        ret = -EFAULT;
-        goto out_enable_pf;
+        return -EFAULT;
     }
 
     ld_library_path_p = stackp = ALIGN_DOWN(stackp - sizeof(kLdLibraryPath), 8);
     ret = copy_to_user(ld_library_path_p, kLdLibraryPath, sizeof(kLdLibraryPath));
     if (ret != 0) {
         pr_warn("write ld_library_path when adb_root_handle_execve failed: %ld\n", ret);
-        ret = -EFAULT;
-        goto out_enable_pf;
+        return -EFAULT;
     }
 
     for (;;) {
@@ -162,9 +173,6 @@ out_release_env_p:
     if (tmp_env_p) {
         kfree(tmp_env_p);
     }
-
-out_enable_pf:
-    pagefault_enable();
 
     return ret;
 }
@@ -240,6 +248,20 @@ void __init ksu_adb_root_init(void)
 {
     if (ksu_register_feature_handler(&ksu_adb_root_handler)) {
         pr_err("Failed to register adb_root feature handler\n");
+    }
+
+    /*
+     * TB301FU: adbd is exec'd from early userspace, well before the
+     * KernelSU manager ever runs. adb_root is a static_key and static keys
+     * do not persist across reboots, so on a fresh boot the branch in
+     * ksu_adb_root_handle_execve() is never taken and `adb shell` comes up
+     * unprivileged until a human opens the manager and flips the switch.
+     * Enabling it here (same effect as force_feature=adb_root:1, but
+     * without having to edit the DTB) keeps adb root working unattended.
+     */
+    if (IS_ENABLED(CONFIG_KSU_ADB_ROOT_DEFAULT)) {
+        static_key_enable(&ksu_adb_root.key);
+        pr_info("adb_root: enabled by default at boot\n");
     }
 }
 

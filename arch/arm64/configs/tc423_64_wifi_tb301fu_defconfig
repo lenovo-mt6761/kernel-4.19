@@ -540,3 +540,7 @@ CONFIG_KSU=y
 # 4.19 arm64: kprobes+tracepoint hook (only mode that installs the
 # [ksu_driver] fd for the manager via the setresuid sys_enter hook)
 CONFIG_KSU_KPROBES_HOOK=y
+# adbd execs from early userspace, far before the manager runs; adb_root is a
+# static_key so it resets on every reboot. Enable it at init instead of
+# relying on a manual toggle. (= force_feature=adb_root:1, no DTB edit)
+CONFIG_KSU_ADB_ROOT_DEFAULT=y

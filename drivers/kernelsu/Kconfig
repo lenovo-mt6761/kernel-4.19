@@ -40,6 +40,24 @@ config KSU_ALLOWLIST_WORKAROUND
 	help
 	  Enable workaround for broken allowlist save
 
+config KSU_ADB_ROOT_DEFAULT
+	bool "Enable adb_root by default at boot"
+	depends on KSU
+	default y
+	help
+	  Turn the adb_root feature on during kernelsu_init instead of waiting
+	  for the manager to flip it at runtime.
+
+	  This is needed on devices where adbd is exec'd from early userspace,
+	  long before the KernelSU manager ever runs. adb_root is a static_key,
+	  and static keys do not survive a reboot, so without this the execve
+	  hook is a no-op on every fresh boot and `adb shell` stays unprivileged
+	  until someone opens the manager and toggles the switch by hand.
+
+	  Leave this off if you prefer to control adb_root from the manager UI
+	  only. It is equivalent to passing force_feature=adb_root:1 on the
+	  kernel command line, but does not require editing the DTB.
+
 # For easier extern ifdef handling
 config KSU_MANUAL_HOOK
 	bool "KernelSU manual hook mode."
