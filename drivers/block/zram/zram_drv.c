@@ -1029,6 +1029,21 @@ static ssize_t comp_algorithm_store(struct device *dev,
 	if (sz > 0 && compressor[sz - 1] == '\n')
 		compressor[sz - 1] = 0x00;
 
+	/*
+	 * TB301FU: force the default compressor.
+	 *
+	 * The vendor ramdisk / Android fs_mgr selects "lz4" for zram before
+	 * swapon (this is AOSP's default for the zram compressor), which
+	 * overrides the in-kernel default set above. Redirect lz4/lz4hc to
+	 * our chosen default so the write still succeeds (a -EINVAL here
+	 * would otherwise make userspace skip zram setup) while the actual
+	 * compression runs with the algorithm we want.
+	 */
+	if (strcmp(compressor, "lz4") == 0 ||
+	    strcmp(compressor, "lz4hc") == 0)
+		strlcpy(compressor, default_compressor,
+			sizeof(compressor));
+
 	if (!zcomp_available_algorithm(compressor))
 		return -EINVAL;
 
