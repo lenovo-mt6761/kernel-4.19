@@ -15,6 +15,18 @@ config ZRAM
 
 	  See Documentation/blockdev/zram.txt for more information.
 
+config ZRAM_DEF_COMP_LZ4
+	bool "LZ4 compression algorithm"
+	depends on ZRAM && CRYPTO_LZ4
+
+config ZRAM_DEF_COMP_LZ4HC
+	bool "LZ4HC compression algorithm"
+	depends on ZRAM && CRYPTO_LZ4HC
+
+config ZRAM_DEF_COMP_ZSTD
+	bool "ZSTD compression algorithm"
+	depends on ZRAM && CRYPTO_ZSTD
+
 config ZRAM_WRITEBACK
        bool "Write back incompressible or idle page to backing device"
        depends on ZRAM
